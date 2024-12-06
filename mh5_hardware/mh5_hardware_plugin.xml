@@ -1,0 +1,9 @@
+<library path="mh5_hardware">
+  <class name="mh5_hardware/MH5DynamixelBus"
+         type="mh5_hardware::MH5DynamixelBus"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      Dynamixel interface for MH5.
+    </description>
+  </class>
+</library>
