@@ -18,8 +18,10 @@
 #include "hardware_interface/hardware_info.hpp"
 #include "hardware_interface/system_interface.hpp"
 #include "dynamixel_sdk/packet_handler.h"
+#include "dynamixel_sdk/dynamixel_sdk.h"
 
 #include "mh5_hardware/port_handler.hpp"
+#include "mh5_hardware/dynamixel_joint.hpp"
 
 namespace mh5_hardware
 {
@@ -44,6 +46,7 @@ namespace mh5_hardware
  */
 class MH5DynamixelBus: public hardware_interface::SystemInterface
 {
+  ~MH5DynamixelBus(); // handles the Ctr-C shutdown
 
   hardware_interface::CallbackReturn on_init(
     const hardware_interface::HardwareInfo & info) override;
@@ -76,9 +79,19 @@ protected:
     bool            rs485_;
     double          protocol_;
 
-    // dynamixel
+    // dynamixel communication
     mh5_port_handler::PortHandlerMH5    *portHandler_;
     dynamixel::PacketHandler            *packetHandler_;
+
+    // resources
+    int                                 num_joints_;
+    std::vector<DynamixelJoint>         joints_{};
+
+    // dynamixel loops
+    std::unique_ptr<dynamixel::GroupSyncRead>            pve_read;
+
+    // int                         num_sensors_;
+    // std::vector<FootSensor *>   foot_sensors_;
 
     /**
      * @brief Initializes the Dynamixel port.
@@ -91,8 +104,8 @@ protected:
     /**
      * @brief Initializes the joints.
      * 
-     * @return true 
-     * @return false 
+     * @return true if all joints have been initialized successfully
+     * @return false if any of the joints raised errors
      */
     bool initJoints();
 
@@ -130,6 +143,9 @@ protected:
      * @return true 
      */
     bool setupDynamixelLoops();
+
+    // bool ping(const uint8_t id, const int num_tries=5);
+
 };
 
 } //namespace mh5_hardware
