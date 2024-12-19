@@ -324,21 +324,22 @@ MH5DynamixelBus::export_command_interfaces()
 hardware_interface::CallbackReturn
 MH5DynamixelBus::on_activate(const rclcpp_lifecycle::State & /*previous_state*/)
 {
-    uint8_t dxl_error;
+    // uint8_t dxl_error;
 
-    for (auto & joint : joints_) {
-        if (packetHandler_->write1ByteTxRx(portHandler_, joint.id_, 64, 1, &dxl_error) != COMM_SUCCESS) {
-            RCLCPP_WARN(LOG, "failed to activate joint %s; communication error; will be marked as inactive", joint.name_.c_str());
-            joint.available_ =  false;
-        }
-        else if (dxl_error != 0) {
-            RCLCPP_WARN(LOG, "failed to activate joint %s; device error %u; will be marked as inactive", joint.name_.c_str(), dxl_error);
-            joint.available_ = false;
-        }
-        else {
-            RCLCPP_INFO(LOG, "joint %s[%i] activated", joint.name_.c_str(), joint.id_);
-        }
-    }
+    // do not activate the servos; this will be the job of the controllers if they need to send commands
+    // for (auto & joint : joints_) {
+    //     if (packetHandler_->write1ByteTxRx(portHandler_, joint.id_, 64, 1, &dxl_error) != COMM_SUCCESS) {
+    //         RCLCPP_WARN(LOG, "failed to activate joint %s; communication error; will be marked as inactive", joint.name_.c_str());
+    //         joint.available_ =  false;
+    //     }
+    //     else if (dxl_error != 0) {
+    //         RCLCPP_WARN(LOG, "failed to activate joint %s; device error %u; will be marked as inactive", joint.name_.c_str(), dxl_error);
+    //         joint.available_ = false;
+    //     }
+    //     else {
+    //         RCLCPP_INFO(LOG, "joint %s[%i] activated", joint.name_.c_str(), joint.id_);
+    //     }
+    // }
 
     return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -364,11 +365,14 @@ MH5DynamixelBus::on_deactivate(const rclcpp_lifecycle::State & /*previous_state*
 }
 
 hardware_interface::return_type
-MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period)
+MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & /*period*/)
 {
+    int dxl_comm_result = COMM_TX_FAIL;
+
     // position, velocity, effort
-    if (pve_read->txRxPacket() != COMM_SUCCESS) {
-        RCLCPP_DEBUG(LOG, "pve SyncRead communication failed");
+    dxl_comm_result = pve_read->txRxPacket();
+    if (dxl_comm_result != COMM_SUCCESS) {
+        RCLCPP_DEBUG(LOG, "pve SyncRead communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
     }
     else {
         for (auto  & joint : joints_) {
@@ -377,7 +381,7 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period
                     RCLCPP_DEBUG(LOG, "pve SyncRead getting position for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                 }
                 else {
-                    uint32_t pos = pve_read->getData(joint.id_, 132, 4);
+                    int32_t pos = pve_read->getData(joint.id_, 132, 4);
                     joint.position_ = (pos - 2047) * 0.001533980787886;
                 }
 
@@ -385,7 +389,7 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period
                     RCLCPP_DEBUG(LOG, "pve SyncRead getting velocity for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                 }
                 else {
-                    uint32_t vel = pve_read->getData(joint.id_, 128, 4);
+                    int32_t vel = pve_read->getData(joint.id_, 128, 4);
                     joint.velocity_ = vel  * 0.023980823922402;
                 }
 
@@ -393,7 +397,7 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period
                     RCLCPP_DEBUG(LOG, "pve SyncRead getting effort for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                 }
                 else {
-                    uint16_t eff = pve_read->getData(joint.id_, 126, 24);
+                    int16_t eff = pve_read->getData(joint.id_, 126, 24);
                     joint.effort_ = eff * 0.0014;
                 }
             }
@@ -404,7 +408,7 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period
 }
 
 hardware_interface::return_type
-MH5DynamixelBus::write(const rclcpp::Time & time, const rclcpp::Duration & period)
+MH5DynamixelBus::write(const rclcpp::Time & time, const rclcpp::Duration & /*period*/)
 {
     return hardware_interface::return_type::OK;
 }

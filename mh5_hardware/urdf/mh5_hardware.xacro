@@ -8,8 +8,9 @@
       <param name="init_${name}">${address},${length},${value} </param>
     </xacro:macro>
 
-    <xacro:macro name="common_init">
+    <xacro:macro name="common_init" params="direction">
       <xacro:register_init name="return_delay" address="9" length="1" value="0" />
+      <xacro:register_init name="drive_mode" address="10" length="1" value="${direction}" />
       <xacro:register_init name="operating_mode" address="11" length="1" value="3" />
       <xacro:register_init name="temp_limit" address="31" length="1" value="75" />
       <xacro:register_init name="volt_limit" address="32" length="2" value="135" />
@@ -18,17 +19,25 @@
       <xacro:register_init name="max_pos" address="48" length="4" value="4095" />
     </xacro:macro>
 
-    <xacro:macro name="mh5_servo" params="joint_name id">
+    <xacro:macro name="mh5_servo" params="joint_name id direction">
       <joint name="${joint_name}">
         <param name="id">${id}</param>
-        <xacro:common_init />
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-        <state_interface name="effort"/>
+        <xacro:common_init direction="${direction}" />
+        <state_interface name="position" />
+        <state_interface name="velocity" />
+        <state_interface name="effort" />
       </joint>
     </xacro:macro>
 
     <ros2_control name="upper_body" type="system">
+
+      <xacro:if value="${use_mock_hardware}">
+        <hardware>
+          <plugin>mock_components/GenericSystem</plugin>
+          <param name="calculate_dynamics">true</param>
+        </hardware>
+      </xacro:if>
+
       <xacro:unless value="${use_mock_hardware}">
         <hardware>
           <plugin>mh5_hardware/MH5DynamixelBus</plugin>
@@ -40,85 +49,22 @@
         </hardware>
       </xacro:unless>
 
-      <xacro:mh5_servo joint_name="l_sho_p" id="34" />
-      <xacro:mh5_servo joint_name="l_sho_r" id="33" />
-      <xacro:mh5_servo joint_name="l_elb_y" id="32" />
-      <xacro:mh5_servo joint_name="l_elb_p" id="31" />
-      <xacro:mh5_servo joint_name="r_sho_p" id="44" />
-      <xacro:mh5_servo joint_name="r_sho_r" id="43" />
-      <xacro:mh5_servo joint_name="r_elb_y" id="42" />
-      <xacro:mh5_servo joint_name="r_elb_p" id="41" />
-      <xacro:mh5_servo joint_name="head_y" id="51" />
-      <xacro:mh5_servo joint_name="head_p" id="52" />
-      <!-- <xacro:if value="${use_mock_hardware}">
-        <hardware>
-          <plugin>mock_components/GenericSystem</plugin>
-          <param name="calculate_dynamics">true</param>
-        </hardware>
-      </xacro:if> -->
+      <xacro:mh5_servo joint_name="l_sho_p" id="34" direction="1" />
+      <xacro:mh5_servo joint_name="l_sho_r" id="33" direction="1" />
+      <xacro:mh5_servo joint_name="l_elb_y" id="32" direction="1" />
+      <xacro:mh5_servo joint_name="l_elb_p" id="31" direction="0" />
+      <xacro:mh5_servo joint_name="r_sho_p" id="44" direction="0" />
+      <xacro:mh5_servo joint_name="r_sho_r" id="43" direction="0" />
+      <xacro:mh5_servo joint_name="r_elb_y" id="42" direction="0" />
+      <xacro:mh5_servo joint_name="r_elb_p" id="41" direction="1" />
+      <xacro:mh5_servo joint_name="head_p" id="51" direction="0" />
+      <xacro:mh5_servo joint_name="head_y" id="52" direction="0" />
 
-      <!-- <xacro:macro name="wheel_joint" params="side pin_p pin_n">
-        <joint name="${side}_wheel_joint">
-          <command_interface name="velocity"/>
-          <command_interface name="max_velocity"/>
-          <state_interface name="velocity"/>
-          <param name="pin_p">${pin_p}</param>
-          <param name="pin_n">${pin_n}</param>
-          <param name="model">MotorHBridgeNoecoder</param>
-          <param name="max_velocity">19.8962</param>
-        </joint>
-      </xacro:macro> -->
-
-      <!-- <xacro:macro name="button" params="id">
-        <gpio name="button_${id}">
-          <state_interface name="pressed"/>
-          <state_interface name="led"/>
-          <command_interface name="reset"/>
-          <command_interface name="led"/>
-        </gpio>
-      </xacro:macro> -->
-
-      <!-- <xacro:macro name="rgb_led" params="id">
-        <gpio name="led_${id}">
-          <command_interface name="red"/>
-          <command_interface name="green"/>
-          <command_interface name="blue"/>
-        </gpio>
-      </xacro:macro> -->
-<!-- 
-      <xacro:wheel_joint side="left" pin_p="11" pin_n="8" />
-      <xacro:wheel_joint side="right" pin_p="10" pin_n="9" />       -->
-
-      <!-- <sensor name="ultrasonic">
-        <command_interface name="offset">
-          <param name="initial_value">190000</param>
-          <param name="min">10000</param>
-          <param name="max">500000</param>
-        </command_interface>
-        <command_interface name="timeout">
-          <param name="initial_value">50</param>
-        </command_interface>
-        <command_interface name="samples">
-          <param name="initial_value">10</param>
-        </command_interface>
-        <state_interface name="distance"/>
-        <param name="pin_trigger">13</param>
-        <param name="pin_echo">25</param>
-      </sensor> -->
-
-
-
-      <!-- <xacro:button id="a" />
-      <xacro:button id="b" />
-      <xacro:button id="x" />
-      <xacro:button id="y" /> -->
-
-      <!-- <xacro:rgb_led id="front_left" />
-      <xacro:rgb_led id="front_right" />
-      <xacro:rgb_led id="middle_left" />
-      <xacro:rgb_led id="middle_right" />
-      <xacro:rgb_led id="back_left" />
-      <xacro:rgb_led id="back_right" /> -->
+      <sensor name="pve_communication">
+        <param name="rate">200</param>
+        <state_interface name="packets" />
+        <state_interface name="errors" />
+      </sensor>
 
     </ros2_control>
 
