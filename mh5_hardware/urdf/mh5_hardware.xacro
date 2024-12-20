@@ -17,6 +17,12 @@
       <xacro:register_init name="vel_limit" address="44" length="4" value="1023" />
       <xacro:register_init name="min_pos" address="52" length="4" value="0" />
       <xacro:register_init name="max_pos" address="48" length="4" value="4095" />
+      <xacro:register_init name="indirect_torque" address="168" length="2" value="64" />
+      <xacro:register_init name="indirect_hwerr" address="170" length="2" value="70" />
+      <xacro:register_init name="indirect_volt_l" address="172" length="2" value="144" />
+      <xacro:register_init name="indirect_volt_h" address="174" length="2" value="145" />
+      <xacro:register_init name="indirect_temp" address="176" length="2" value="146" />
+      <xacro:register_init name="indirect_led" address="178" length="2" value="65" />
     </xacro:macro>
 
     <xacro:macro name="mh5_servo" params="joint_name id direction">
@@ -26,6 +32,15 @@
         <state_interface name="position" />
         <state_interface name="velocity" />
         <state_interface name="effort" />
+        <state_interface name="temperature" />
+        <state_interface name="voltage" />
+        <state_interface name="torque_enable" />
+        <state_interface name="error_overload" />
+        <state_interface name="error_electrical_shock" />
+        <state_interface name="error_motor_encoder" />
+        <state_interface name="error_overheating" />
+        <state_interface name="error_input_voltage" />
+        <state_interface name="led" />
       </joint>
     </xacro:macro>
 
@@ -60,11 +75,11 @@
       <xacro:mh5_servo joint_name="head_p" id="51" direction="0" />
       <xacro:mh5_servo joint_name="head_y" id="52" direction="0" />
 
-      <sensor name="pve_communication">
+      <!-- <sensor name="pve_communication">
         <param name="rate">200</param>
         <state_interface name="packets" />
         <state_interface name="errors" />
-      </sensor>
+      </sensor> -->
 
     </ros2_control>
 

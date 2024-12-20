@@ -88,7 +88,10 @@ protected:
     std::vector<DynamixelJoint>         joints_{};
 
     // dynamixel loops
-    std::unique_ptr<dynamixel::GroupSyncRead>            pve_read;
+    std::unique_ptr<dynamixel::GroupSyncRead>            pve_read_;
+    std::unique_ptr<dynamixel::GroupSyncRead>            stat_read_;
+    rclcpp::Time                                         stat_read_last_run_;
+    double                                               stat_read_rate_;
 
     // int                         num_sensors_;
     // std::vector<FootSensor *>   foot_sensors_;
@@ -130,12 +133,12 @@ protected:
      * found in the parameter server
      * @return Loop* the newly created loop object
      */
-    template <class Loop>
-    Loop* setupLoop(std::string name, const double default_rate);
+    // template <class Loop>
+    // Loop* setupLoop(std::string name, const double default_rate);
 
     /**
      * @brief Creates and initializes all the loops used by the HW interface:
-     * - Read: position, velocity, load (pvl_reader)
+     * - Read: position, velocity, effort (pve_reader)
      * - Read: temperature, voltage (tv_reader)
      * - Write: position, velocity (pv_writer)
      * - Write: torque (t_writer)

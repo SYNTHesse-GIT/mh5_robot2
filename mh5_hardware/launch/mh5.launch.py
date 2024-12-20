@@ -53,13 +53,23 @@ def generate_launch_description():
     # controllers
     controllers = [
         "joint_state_broadcaster",
+        "joint_status_broadcaster",
     ]
 
+    remap = {
+        "joint_status_broadcaster": "-r dynamic_joint_states:=joint_statuses"
+    }
+
     controller_nodes = [
-        Node(package="controller_manager",
-             executable="spawner",
-             arguments=[controller_name,
-                        "--param-file", robot_controllers_yaml])
+        Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=[
+                controller_name,
+                "--param-file", robot_controllers_yaml,
+                "--controller-ros-args", remap.get(controller_name,"")
+            ],
+        )
         for controller_name in controllers
     ]
 

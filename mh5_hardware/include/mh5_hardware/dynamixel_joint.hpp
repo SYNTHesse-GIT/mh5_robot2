@@ -15,6 +15,17 @@ struct DynamixelJoint
     double                              velocity_;
     double                              effort_;
 
+    double                              torque_enable_;
+    double                              temperature_;
+    double                              voltage_;
+    double                              error_overload_;
+    double                              error_electrical_shock_;
+    double                              error_motor_encoder_;
+    double                              error_overheating_;
+    double                              error_input_voltage_;
+    double                              led_;
+
+
     double                              position_command_;
     double                              velocity_command_;
     double                              effort_command_;
@@ -32,4 +43,4 @@ struct DynamixelJoint
 
 } // namespace mh5_hardware
 
-#endif // MH5_HARDWARE_DYNAMIXEL_JOINT_HPP_
+#endif
