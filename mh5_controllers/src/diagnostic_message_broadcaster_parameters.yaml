@@ -1,0 +1,16 @@
+diagnostic_message_broadcaster:
+  topic: {
+    type: string,
+    default_value: "diagnostic",
+    description: "The topic that will be used for publishing the diagnostic messages"
+  }
+  sensors: {
+    type: string_array,
+    default_value: [],
+    description: "The list of sensors for which we will publish the diagnostic messages",
+  }
+  interfaces: {
+    type: string_array,
+    default_value: [],
+    description: "The list of state interfaces that provide the diagnostic values",
+  }
