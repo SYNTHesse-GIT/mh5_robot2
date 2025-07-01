@@ -44,7 +44,7 @@
       </joint>
     </xacro:macro>
 
-    <ros2_control name="upper_body" type="system">
+    <ros2_control name="upper_body" type="system" is_async="true" thread_priority="30">
 
       <xacro:if value="${use_mock_hardware}">
         <hardware>
@@ -56,7 +56,7 @@
       <xacro:unless value="${use_mock_hardware}">
         <hardware>
           <plugin>mh5_hardware/MH5DynamixelBus</plugin>
-          <param name="debug">yes</param>
+          <param name="debug">no</param>
           <param name="port">/dev/ttySC0</param>
           <param name="baudrate">2000000</param>
           <param name="protocol">2.0</param>
@@ -66,14 +66,55 @@
 
       <xacro:mh5_servo joint_name="l_sho_p" id="34" direction="1" />
       <xacro:mh5_servo joint_name="l_sho_r" id="33" direction="1" />
-      <xacro:mh5_servo joint_name="l_elb_y" id="32" direction="1" />
+      <xacro:mh5_servo joint_name="l_elb_r" id="32" direction="1" />
       <xacro:mh5_servo joint_name="l_elb_p" id="31" direction="0" />
       <xacro:mh5_servo joint_name="r_sho_p" id="44" direction="0" />
       <xacro:mh5_servo joint_name="r_sho_r" id="43" direction="0" />
-      <xacro:mh5_servo joint_name="r_elb_y" id="42" direction="0" />
+      <xacro:mh5_servo joint_name="r_elb_r" id="42" direction="0" />
       <xacro:mh5_servo joint_name="r_elb_p" id="41" direction="1" />
       <xacro:mh5_servo joint_name="head_p" id="51" direction="0" />
       <xacro:mh5_servo joint_name="head_y" id="52" direction="0" />
+
+      <!-- <sensor name="pve_communication">
+        <param name="rate">200</param>
+        <state_interface name="packets" />
+        <state_interface name="errors" />
+      </sensor> -->
+
+    </ros2_control>
+
+    <ros2_control name="lower_body" type="system"  is_async="true" thread_priority="30">
+
+      <xacro:if value="${use_mock_hardware}">
+        <hardware>
+          <plugin>mock_components/GenericSystem</plugin>
+          <param name="calculate_dynamics">true</param>
+        </hardware>
+      </xacro:if>
+
+      <xacro:unless value="${use_mock_hardware}">
+        <hardware>
+          <plugin>mh5_hardware/MH5DynamixelBus</plugin>
+          <param name="debug">no</param>
+          <param name="port">/dev/ttySC1</param>
+          <param name="baudrate">2000000</param>
+          <param name="protocol">2.0</param>
+          <param name="rs485">yes</param>
+        </hardware>
+      </xacro:unless>
+
+      <xacro:mh5_servo joint_name="l_hip_r" id="16" direction="1" />
+      <xacro:mh5_servo joint_name="l_hip_p" id="15" direction="1" />
+      <xacro:mh5_servo joint_name="l_kne_p" id="14" direction="1" />   <!--  offset pi/2!  -->
+      <xacro:mh5_servo joint_name="l_kne_y" id="13" direction="1" />
+      <xacro:mh5_servo joint_name="l_ank_p" id="12" direction="1" />
+      <xacro:mh5_servo joint_name="l_ank_r" id="11" direction="0" />
+      <xacro:mh5_servo joint_name="r_hip_r" id="26" direction="0" />
+      <xacro:mh5_servo joint_name="r_hip_p" id="25" direction="0" />
+      <xacro:mh5_servo joint_name="r_kne_p" id="24" direction="1" />   <!--  offset pi/2!  -->
+      <xacro:mh5_servo joint_name="r_kne_y" id="23" direction="0" />
+      <xacro:mh5_servo joint_name="r_ank_p" id="22" direction="1" />
+      <xacro:mh5_servo joint_name="r_ank_r" id="21" direction="1" />
 
       <!-- <sensor name="pve_communication">
         <param name="rate">200</param>

@@ -20,19 +20,6 @@
 namespace mh5_hardware
 {
 
-#define LOG rclcpp::get_logger(info_.name)
-
-
-MH5DynamixelBus::~MH5DynamixelBus() 
-{
-    // If the controller manager is shutdown via Ctrl + C the on_deactivate methods won't be called.
-    // We therefore need to make sure to actually deactivate the communication
-    //
-    // see: https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver/blob/e5ba31cd38c34076f95b25a047daaa16f7c3466c/ur_robot_driver/src/hardware_interface.cpp#L58C1-L63C2
-    // and: https://github.com/ros-controls/ros2_control/issues/472
-    on_deactivate(rclcpp_lifecycle::State());
-}
-
 
 hardware_interface::CallbackReturn 
 MH5DynamixelBus::on_init(const hardware_interface::HardwareInfo & info)
@@ -43,10 +30,10 @@ MH5DynamixelBus::on_init(const hardware_interface::HardwareInfo & info)
     }
 
     if (info_.hardware_parameters["debug"] == "yes") {
-        LOG.set_level(rclcpp::Logger::Level::Debug);
+        get_logger().set_level(rclcpp::Logger::Level::Debug);
     }
 
-    RCLCPP_INFO(LOG, "initializing");
+    RCLCPP_INFO(get_logger(), "initializing");
 
     if (!initPort()) return hardware_interface::CallbackReturn::ERROR;
     if (!initJoints()) return hardware_interface::CallbackReturn::ERROR;
@@ -62,68 +49,68 @@ bool MH5DynamixelBus::initPort()
     // get the serial port configuration
     port_ = info_.hardware_parameters["port"];
     if (port_ == "") {
-        RCLCPP_ERROR(LOG, "port name was not specified");
+        RCLCPP_ERROR(get_logger(), "port name was not specified");
         return false;
     }
-    RCLCPP_INFO(LOG, "using port %s", port_.c_str());
+    RCLCPP_INFO(get_logger(), "using port %s", port_.c_str());
 
     // baud rate
     auto baud_str = info_.hardware_parameters["baudrate"];
     if (baud_str == "") {
-        RCLCPP_INFO(LOG, "no baudrate specified, will default to 1000000 bps");
+        RCLCPP_INFO(get_logger(), "no baudrate specified, will default to 1000000 bps");
         baudrate_ = 1000000;
     }
     else {
         baudrate_ = stoi(baud_str);
-        RCLCPP_INFO(LOG, "baudrate %d", baudrate_);
+        RCLCPP_INFO(get_logger(), "baudrate %d", baudrate_);
     }
 
     // rs485 config
     rs485_ = (info_.hardware_parameters["rs485"] == "yes");
     if (rs485_) {
-        RCLCPP_INFO(LOG, "using rs485 hardware control");
+        RCLCPP_INFO(get_logger(), "using rs485 hardware control");
     }
 
     // Dynamixel protocol
     auto protocol_str = info_.hardware_parameters["protocol"];
     if(protocol_str == "") {
-        RCLCPP_INFO(LOG, "no protocol specified, will default to 2.0");
+        RCLCPP_INFO(get_logger(), "no protocol specified, will default to 2.0");
         protocol_ = 2.0;
     } else if (protocol_str == "1.0") {
         protocol_ = 1.0;
     } else if (protocol_str == "2.0") {
         protocol_ = 2.0;
     } else {
-        RCLCPP_ERROR(LOG, "protocol %f unsupported", protocol_);
+        RCLCPP_ERROR(get_logger(), "protocol %f unsupported", protocol_);
         return false;
     }
-    RCLCPP_INFO(LOG, "using protocol %3.1f", protocol_);
+    RCLCPP_INFO(get_logger(), "using protocol %3.1f", protocol_);
 
     // open and configure the serial port
     portHandler_ = new mh5_port_handler::PortHandlerMH5(port_.c_str());
     if (! portHandler_->openPort()) {
-        RCLCPP_ERROR(LOG, "failed to open port %s", port_.c_str());
+        RCLCPP_ERROR(get_logger(), "failed to open port %s", port_.c_str());
         return false;
     }
-    RCLCPP_INFO(LOG, "successfully opened port %s", port_.c_str());
+    RCLCPP_INFO(get_logger(), "successfully opened port %s", port_.c_str());
 
     if (!portHandler_->setBaudRate(baudrate_)) {
-        RCLCPP_ERROR(LOG, "failed to set baud rate %i bps on port %s", baudrate_, port_.c_str());
+        RCLCPP_ERROR(get_logger(), "failed to set baud rate %i bps on port %s", baudrate_, port_.c_str());
         return false;
     }
-    RCLCPP_INFO(LOG, "successfully set baud rate %i bps on port %s", baudrate_, port_.c_str());
+    RCLCPP_INFO(get_logger(), "successfully set baud rate %i bps on port %s", baudrate_, port_.c_str());
     
     if (rs485_) {
         if (!portHandler_->setRS485() ) {
-            RCLCPP_ERROR(LOG, "failed to configure RS485 on port %s", port_.c_str());
+            RCLCPP_ERROR(get_logger(), "failed to configure RS485 on port %s", port_.c_str());
         return false;
         }
-        RCLCPP_INFO(LOG, "successfully configured RS485 on port %s", port_.c_str());
+        RCLCPP_INFO(get_logger(), "successfully configured RS485 on port %s", port_.c_str());
     }
 
     // Dynamixel packet handler
     packetHandler_ = dynamixel::PacketHandler::getPacketHandler((float)protocol_);
-    RCLCPP_INFO(LOG, "Dynamixel protocol %3.1f initialzed", protocol_);
+    RCLCPP_INFO(get_logger(), "Dynamixel protocol %3.1f initialzed", protocol_);
 
     return true;
 }
@@ -134,18 +121,18 @@ bool MH5DynamixelBus::initJoints()
     //get joint names and num of joint
     num_joints_ = info_.joints.size();
     if (num_joints_ == 0) {
-        RCLCPP_ERROR(LOG, "no joints defined");
+        RCLCPP_ERROR(get_logger(), "no joints defined");
         return false;
     }
-    RCLCPP_INFO(LOG, "configuring %d joints", num_joints_);
+    RCLCPP_INFO(get_logger(), "configuring %d joints", num_joints_);
 
     for (auto joint : info_.joints) {
         if (joint.name == "") {
-            RCLCPP_ERROR(LOG, "there is a joint without a name in the URDF");
+            RCLCPP_ERROR(get_logger(), "there is a joint without a name in the URDF");
             return false;
         }
         if (joint.parameters["id"] == "") {
-            RCLCPP_ERROR(LOG, "missing ID for joint %s", joint.name.c_str());
+            RCLCPP_ERROR(get_logger(), "missing ID for joint %s", joint.name.c_str());
             return false;
         }
         int id;
@@ -153,7 +140,7 @@ bool MH5DynamixelBus::initJoints()
             id = stoi(joint.parameters["id"]);
         } 
         catch (std::invalid_argument const& ex) {
-            RCLCPP_ERROR(LOG, "failed to parse ID of joint %s: %s", joint.name.c_str(), joint.parameters["id"].c_str());
+            RCLCPP_ERROR(get_logger(), "failed to parse ID of joint %s: %s", joint.name.c_str(), joint.parameters["id"].c_str());
             return false;
         }
         auto j = DynamixelJoint(joint.name, id);
@@ -161,15 +148,15 @@ bool MH5DynamixelBus::initJoints()
         int dxl_comm_result;
         uint8_t dxl_error = 0;
         if (packetHandler_->ping(portHandler_, id, &dxl_error) != COMM_SUCCESS) {
-            RCLCPP_WARN(LOG, "failed to communicate with joint %s[%i], will be marked as inactive", joint.name.c_str(), id);
+            RCLCPP_WARN(get_logger(), "failed to communicate with joint %s[%i], will be marked as inactive", joint.name.c_str(), id);
             j.available_ = false;
         }
         else if (dxl_error != 0) {
-            RCLCPP_WARN(LOG, "joint %s[%i] reported error %u, will be marked as inactive", joint.name.c_str(), id, dxl_error);
+            RCLCPP_WARN(get_logger(), "joint %s[%i] reported error %u, will be marked as inactive", joint.name.c_str(), id, dxl_error);
             j.available_ = false;
         }
         else {
-            RCLCPP_INFO(LOG, "joint %s[%i] detected", joint.name.c_str(), id);
+            RCLCPP_INFO(get_logger(), "joint %s[%i] detected", joint.name.c_str(), id);
             j.available_ = true;
             // inits
             for (auto init : joint.parameters) {
@@ -186,7 +173,7 @@ bool MH5DynamixelBus::initJoints()
                     }
                     tokens.push_back(init_string);
                     if (tokens.size() < 3) {
-                        RCLCPP_WARN(LOG, "init %s for joint %s incomplete: %s; will be ignored", 
+                        RCLCPP_WARN(get_logger(), "init %s for joint %s incomplete: %s; will be ignored", 
                                     init.first.c_str(), joint.name.c_str(), init.second.c_str());
                     }
                     else {
@@ -199,7 +186,7 @@ bool MH5DynamixelBus::initJoints()
                             value = stoi(tokens[2]);
                         }
                         catch(std::invalid_argument const& ex) {
-                            RCLCPP_WARN(LOG, "init %s for joint %s cannot be parsed: %s; will be ignored", 
+                            RCLCPP_WARN(get_logger(), "init %s for joint %s cannot be parsed: %s; will be ignored", 
                                     init.first.c_str(), joint.name.c_str(), init.second.c_str());
                             continue;
                         }
@@ -214,25 +201,25 @@ bool MH5DynamixelBus::initJoints()
                                 dxl_comm_result = packetHandler_->write4ByteTxRx(portHandler_, id, address, (uint32_t)value, &dxl_error);
                                 break;
                             default:
-                                RCLCPP_WARN(LOG, "init %s for joint %s has incorrect number of bytes: %s; will be ignored", 
+                                RCLCPP_WARN(get_logger(), "init %s for joint %s has incorrect number of bytes: %s; will be ignored", 
                                         init.first.c_str(), joint.name.c_str(), init.second.c_str());
                                 continue;
                                 break;
                         }
                         if (dxl_comm_result != COMM_SUCCESS) {
-                            RCLCPP_WARN(LOG, "failed to write %s for %s[%i]", init.first.c_str(), joint.name.c_str(), id);
+                            RCLCPP_WARN(get_logger(), "failed to write %s for %s[%i]", init.first.c_str(), joint.name.c_str(), id);
                         }
                         else if (dxl_error != 0) {
-                            RCLCPP_WARN(LOG, "error writing %s for %s[%i], error code: %i", init.first.c_str(), joint.name.c_str(), id, dxl_error);
+                            RCLCPP_WARN(get_logger(), "error writing %s for %s[%i], error code: %i", init.first.c_str(), joint.name.c_str(), id, dxl_error);
                         }
                         else {
-                            RCLCPP_DEBUG(LOG, "successfully wrote %s for %s[%i]: %i", init.first.c_str(), joint.name.c_str(), id, value);
+                            RCLCPP_DEBUG(get_logger(), "successfully wrote %s for %s[%i]: %i", init.first.c_str(), joint.name.c_str(), id, value);
                         }
                     }
                 }
             }
 
-            RCLCPP_INFO(LOG, "joint %s[%i] initialized", joint.name.c_str(), id);
+            RCLCPP_INFO(get_logger(), "joint %s[%i] initialized", joint.name.c_str(), id);
         }
 
         joints_.emplace_back(DynamixelJoint(joint.name, id));
@@ -273,21 +260,21 @@ bool MH5DynamixelBus::setupDynamixelLoops()
     for (auto & joint : joints_) {
         if (joint.available_) {
             pve_read_->addParam(joint.id_);
-            RCLCPP_DEBUG(LOG, "pve_read loop added joint %s[%i]", joint.name_.c_str(), joint.id_);
+            RCLCPP_DEBUG(get_logger(), "pve_read loop added joint %s[%i]", joint.name_.c_str(), joint.id_);
         }
     }
-    RCLCPP_INFO(LOG, "pve_read loop configured");
+    RCLCPP_INFO(get_logger(), "pve_read loop configured");
 
     stat_read_ = std::make_unique<dynamixel::GroupSyncRead>(portHandler_, packetHandler_, 224, 6);
     for (auto & joint : joints_) {
         if (joint.available_) {
             stat_read_->addParam(joint.id_);
-            RCLCPP_DEBUG(LOG, "stat_read loop added joint %s[%i]", joint.name_.c_str(), joint.id_);
+            RCLCPP_DEBUG(get_logger(), "stat_read loop added joint %s[%i]", joint.name_.c_str(), joint.id_);
         }
     }
     std::string rate_str = this->info_.hardware_parameters["stat_read_rate"];
     if (rate_str == "") {
-        RCLCPP_INFO(LOG, "stat_read_rate no specified, will default to 1Hz");
+        RCLCPP_INFO(get_logger(), "stat_read_rate no specified, will default to 1Hz");
         stat_read_rate_ = 1.0; 
     }
     else {
@@ -295,12 +282,12 @@ bool MH5DynamixelBus::setupDynamixelLoops()
             stat_read_rate_ = stod(rate_str);
         }
         catch (std::invalid_argument const& ex) {
-            RCLCPP_ERROR(LOG, "failed to parse stat_read rate %s", rate_str.c_str());
+            RCLCPP_ERROR(get_logger(), "failed to parse stat_read rate %s", rate_str.c_str());
             return false;
         }
     }
-    stat_read_last_run_ = rclcpp::Time(0L, RCL_ROS_TIME);
-    RCLCPP_INFO(LOG, "stat_read loop configured");
+    stat_read_last_run_ = get_clock()->now();
+    RCLCPP_INFO(get_logger(), "stat_read loop configured");
 
     return true;
 }
@@ -385,13 +372,13 @@ MH5DynamixelBus::on_deactivate(const rclcpp_lifecycle::State & /*previous_state*
 
     for (auto & joint : joints_) {
         if (packetHandler_->write1ByteTxRx(portHandler_, joint.id_, 64, 0, &dxl_error) != COMM_SUCCESS) {
-            RCLCPP_WARN(LOG, "failed to deactivate joint %s; communication error", joint.name_.c_str());
+            RCLCPP_WARN(get_logger(), "failed to deactivate joint %s; communication error", joint.name_.c_str());
         }
         else if (dxl_error != 0) {
-            RCLCPP_WARN(LOG, "failed to deactivate joint %s; device error %u", joint.name_.c_str(), dxl_error);
+            RCLCPP_WARN(get_logger(), "failed to deactivate joint %s; device error %u", joint.name_.c_str(), dxl_error);
         }
         else {
-            RCLCPP_INFO(LOG, "joint %s[%i] deactivated", joint.name_.c_str(), joint.id_);
+            RCLCPP_INFO(get_logger(), "joint %s[%i] deactivated", joint.name_.c_str(), joint.id_);
         }
     }
 
@@ -406,13 +393,13 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & /*peri
     // position, velocity, effort
     dxl_comm_result = pve_read_->txRxPacket();
     if (dxl_comm_result != COMM_SUCCESS) {
-        RCLCPP_DEBUG(LOG, "pve SyncRead communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
+        RCLCPP_DEBUG(get_logger(), "pve SyncRead communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
     }
     else {
         for (auto  & joint : joints_) {
             if (joint.available_) {
                 if (! pve_read_->isAvailable(joint.id_, 132, 4)) {
-                    RCLCPP_DEBUG(LOG, "pve SyncRead getting position for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                    RCLCPP_DEBUG(get_logger(), "pve SyncRead getting position for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                 }
                 else {
                     int32_t pos = pve_read_->getData(joint.id_, 132, 4);
@@ -420,7 +407,7 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & /*peri
                 }
 
                 if (! pve_read_->isAvailable(joint.id_, 128, 4)) {
-                    RCLCPP_DEBUG(LOG, "pve SyncRead getting velocity for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                    RCLCPP_DEBUG(get_logger(), "pve SyncRead getting velocity for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                 }
                 else {
                     int32_t vel = pve_read_->getData(joint.id_, 128, 4);
@@ -428,7 +415,7 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & /*peri
                 }
 
                 if (! pve_read_->isAvailable(joint.id_, 126, 2)) {
-                    RCLCPP_DEBUG(LOG, "pve SyncRead getting effort for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                    RCLCPP_DEBUG(get_logger(), "pve SyncRead getting effort for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                 }
                 else {
                     int16_t eff = pve_read_->getData(joint.id_, 126, 24);
@@ -439,25 +426,25 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & /*peri
     }
 
     // status: torque, temperature, voltage, error, led
-    rclcpp::Duration actual_period = time - this->stat_read_last_run_;
+    rclcpp::Duration actual_period = get_clock()->now() - this->stat_read_last_run_;
     if (actual_period.seconds() * this->stat_read_rate_ >= 1.0) {
         dxl_comm_result = stat_read_->txRxPacket();
         if (dxl_comm_result != COMM_SUCCESS) {
-            RCLCPP_DEBUG(LOG, "stat SyncRead communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
+            RCLCPP_DEBUG(get_logger(), "stat SyncRead communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
         } 
         else {
-            this->stat_read_last_run_ = time;
+            this->stat_read_last_run_ = get_clock()->now();
             for (auto  & joint : joints_) {
                 if (joint.available_) {
                     if (! stat_read_->isAvailable(joint.id_, 224, 1)) {
-                        RCLCPP_DEBUG(LOG, "stat SyncRead getting torque for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                        RCLCPP_DEBUG(get_logger(), "stat SyncRead getting torque for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                     }
                     else {
                         joint.torque_enable_ = stat_read_->getData(joint.id_, 224, 1);
                     }
 
                     if (! stat_read_->isAvailable(joint.id_, 225, 1)) {
-                        RCLCPP_DEBUG(LOG, "stat SyncRead getting hwerr for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                        RCLCPP_DEBUG(get_logger(), "stat SyncRead getting hwerr for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                     }
                     else {
                         uint8_t data = stat_read_->getData(joint.id_, 225, 1);
@@ -469,14 +456,14 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & /*peri
                     }
 
                     if (! stat_read_->isAvailable(joint.id_, 226, 2)) {
-                        RCLCPP_DEBUG(LOG, "stat SyncRead getting voltage for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                        RCLCPP_DEBUG(get_logger(), "stat SyncRead getting voltage for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                     }
                     else {
                         joint.voltage_ = stat_read_->getData(joint.id_, 226, 2);
                     }
 
                     if (! stat_read_->isAvailable(joint.id_, 228, 1)) {
-                        RCLCPP_DEBUG(LOG, "stat SyncRead getting temp for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                        RCLCPP_DEBUG(get_logger(), "stat SyncRead getting temp for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                     }
                     else {
                         joint.temperature_ = stat_read_->getData(joint.id_, 228, 1);

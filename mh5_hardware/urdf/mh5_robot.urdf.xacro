@@ -3,7 +3,7 @@
 
     <xacro:arg name="use_mock_hardware" default="false" />
 
-    <xacro:include filename="$(find mh5_description)/urdf/mh5_robot_revE.urdf.xacro" />
+    <xacro:include filename="$(find mh5_description)/urdf/mh5_robot_revH.urdf.xacro" />
     <xacro:include filename="mh5_hardware.xacro" />
 
     <xacro:mh5_hardware name="MH5Hardware" use_mock_hardware="$(arg use_mock_hardware)" />

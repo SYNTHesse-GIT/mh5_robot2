@@ -46,7 +46,7 @@ namespace mh5_hardware
  */
 class MH5DynamixelBus: public hardware_interface::SystemInterface
 {
-  ~MH5DynamixelBus(); // handles the Ctr-C shutdown
+  // ~MH5DynamixelBus(); // handles the Ctr-C shutdown
 
   hardware_interface::CallbackReturn on_init(
     const hardware_interface::HardwareInfo & info) override;

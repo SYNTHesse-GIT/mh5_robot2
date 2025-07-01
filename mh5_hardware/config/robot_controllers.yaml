@@ -2,7 +2,7 @@ controller_manager:
 
   ros__parameters:
 
-    update_rate: 20  # Hz
+    update_rate: 100  # Hz
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
@@ -21,12 +21,24 @@ joint_state_broadcaster:
       - head_y
       - l_sho_p
       - l_sho_r
-      - l_elb_y
+      - l_elb_r
       - l_elb_p
       - r_sho_p
       - r_sho_r
-      - r_elb_y
+      - r_elb_r
       - r_elb_p
+      - l_hip_r
+      - l_hip_p
+      - l_kne_p
+      - l_kne_y
+      - l_ank_p
+      - l_ank_r
+      - r_hip_r
+      - r_hip_p
+      - r_kne_p
+      - r_kne_y
+      - r_ank_p
+      - r_ank_r
 
     interfaces:
       - position
@@ -45,12 +57,24 @@ joint_status_broadcaster:
       - head_y
       - l_sho_p
       - l_sho_r
-      - l_elb_y
+      - l_elb_r
       - l_elb_p
       - r_sho_p
       - r_sho_r
-      - r_elb_y
+      - r_elb_r
       - r_elb_p
+      - l_hip_r
+      - l_hip_p
+      - l_kne_p
+      - l_kne_y
+      - l_ank_p
+      - l_ank_r
+      - r_hip_r
+      - r_hip_p
+      - r_kne_p
+      - r_kne_y
+      - r_ank_p
+      - r_ank_r
 
     interfaces:
       - temperature

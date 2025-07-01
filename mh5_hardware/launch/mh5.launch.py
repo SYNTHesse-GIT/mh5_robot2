@@ -67,7 +67,7 @@ def generate_launch_description():
             arguments=[
                 controller_name,
                 "--param-file", robot_controllers_yaml,
-                "--controller-ros-args", remap.get(controller_name,"")
+                # "--controller-ros-args", remap.get(controller_name,"")
             ],
         )
         for controller_name in controllers
