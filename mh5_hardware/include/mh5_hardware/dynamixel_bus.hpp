@@ -90,8 +90,8 @@ protected:
     // dynamixel loops
     std::unique_ptr<dynamixel::GroupSyncRead>            pve_read_;
     std::unique_ptr<dynamixel::GroupSyncRead>            stat_read_;
-    rclcpp::Time                                         stat_read_last_run_;
-    double                                               stat_read_rate_;
+    rclcpp::Time                                         status_read_last_run_;
+    double                                               status_read_rate_;
 
     // int                         num_sensors_;
     // std::vector<FootSensor *>   foot_sensors_;

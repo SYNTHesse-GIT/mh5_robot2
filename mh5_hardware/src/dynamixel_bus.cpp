@@ -272,21 +272,22 @@ bool MH5DynamixelBus::setupDynamixelLoops()
             RCLCPP_DEBUG(get_logger(), "stat_read loop added joint %s[%i]", joint.name_.c_str(), joint.id_);
         }
     }
-    std::string rate_str = this->info_.hardware_parameters["stat_read_rate"];
+    std::string rate_str = this->info_.hardware_parameters["status_read_rate"];
     if (rate_str == "") {
         RCLCPP_INFO(get_logger(), "stat_read_rate no specified, will default to 1Hz");
-        stat_read_rate_ = 1.0; 
+        status_read_rate_ = 1.0; 
     }
     else {
         try {
-            stat_read_rate_ = stod(rate_str);
+            status_read_rate_ = stod(rate_str);
         }
         catch (std::invalid_argument const& ex) {
             RCLCPP_ERROR(get_logger(), "failed to parse stat_read rate %s", rate_str.c_str());
             return false;
         }
     }
-    stat_read_last_run_ = get_clock()->now();
+    // stat_read_interval_ = rclcpp::Duration::from_seconds(1.0 / stat_read_rate);
+    status_read_last_run_ = get_clock()->now();
     RCLCPP_INFO(get_logger(), "stat_read loop configured");
 
     return true;
@@ -426,14 +427,14 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & /*peri
     }
 
     // status: torque, temperature, voltage, error, led
-    rclcpp::Duration actual_period = get_clock()->now() - this->stat_read_last_run_;
-    if (actual_period.seconds() * this->stat_read_rate_ >= 1.0) {
+    rclcpp::Duration actual_passed = time - this->status_read_last_run_;
+    if (actual_passed >= rclcpp::Duration::from_seconds(1.0 / status_read_rate_)) {
         dxl_comm_result = stat_read_->txRxPacket();
         if (dxl_comm_result != COMM_SUCCESS) {
             RCLCPP_DEBUG(get_logger(), "stat SyncRead communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
         } 
         else {
-            this->stat_read_last_run_ = get_clock()->now();
+            this->status_read_last_run_ = time;
             for (auto  & joint : joints_) {
                 if (joint.available_) {
                     if (! stat_read_->isAvailable(joint.id_, 224, 1)) {

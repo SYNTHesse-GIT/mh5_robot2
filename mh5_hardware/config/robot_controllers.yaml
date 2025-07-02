@@ -23,10 +23,12 @@ joint_state_broadcaster:
       - l_sho_r
       - l_elb_r
       - l_elb_p
+      - l_gripper
       - r_sho_p
       - r_sho_r
       - r_elb_r
       - r_elb_p
+      - r_gripper
       - l_hip_r
       - l_hip_p
       - l_kne_p
@@ -59,10 +61,12 @@ joint_status_broadcaster:
       - l_sho_r
       - l_elb_r
       - l_elb_p
+      - l_gripper
       - r_sho_p
       - r_sho_r
       - r_elb_r
       - r_elb_p
+      - r_gripper
       - l_hip_r
       - l_hip_p
       - l_kne_p
