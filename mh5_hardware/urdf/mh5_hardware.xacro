@@ -61,17 +61,18 @@
           <param name="baudrate">2000000</param>
           <param name="protocol">2.0</param>
           <param name="rs485">yes</param>
+          <param name="status_read_rate">0.5</param>
         </hardware>
       </xacro:unless>
 
       <xacro:mh5_servo joint_name="l_sho_p" id="34" direction="1" />
       <xacro:mh5_servo joint_name="l_sho_r" id="33" direction="1" />
       <xacro:mh5_servo joint_name="l_elb_r" id="32" direction="1" />
-      <xacro:mh5_servo joint_name="l_elb_p" id="31" direction="0" />
+      <xacro:mh5_servo joint_name="l_elb_p" id="31" direction="1" />
       <xacro:mh5_servo joint_name="r_sho_p" id="44" direction="0" />
       <xacro:mh5_servo joint_name="r_sho_r" id="43" direction="0" />
       <xacro:mh5_servo joint_name="r_elb_r" id="42" direction="0" />
-      <xacro:mh5_servo joint_name="r_elb_p" id="41" direction="1" />
+      <xacro:mh5_servo joint_name="r_elb_p" id="41" direction="0" />
       <xacro:mh5_servo joint_name="head_p" id="51" direction="0" />
       <xacro:mh5_servo joint_name="head_y" id="52" direction="0" />
 
@@ -100,6 +101,7 @@
           <param name="baudrate">2000000</param>
           <param name="protocol">2.0</param>
           <param name="rs485">yes</param>
+          <param name="status_read_rate">0.5</param>
         </hardware>
       </xacro:unless>
 
@@ -110,7 +112,7 @@
       <xacro:mh5_servo joint_name="l_ank_p" id="12" direction="1" />
       <xacro:mh5_servo joint_name="l_ank_r" id="11" direction="0" />
       <xacro:mh5_servo joint_name="r_hip_r" id="26" direction="0" />
-      <xacro:mh5_servo joint_name="r_hip_p" id="25" direction="0" />
+      <xacro:mh5_servo joint_name="r_hip_p" id="25" direction="1" />
       <xacro:mh5_servo joint_name="r_kne_p" id="24" direction="1" />   <!--  offset pi/2!  -->
       <xacro:mh5_servo joint_name="r_kne_y" id="23" direction="0" />
       <xacro:mh5_servo joint_name="r_ank_p" id="22" direction="1" />
