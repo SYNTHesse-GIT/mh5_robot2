@@ -21,7 +21,7 @@ namespace mh5_hardware
 {
 
 
-hardware_interface::CallbackReturn 
+hardware_interface::CallbackReturn
 MH5DynamixelBus::on_init(const hardware_interface::HardwareInfo & info)
 {
     if (hardware_interface::SystemInterface::on_init(info) !=
@@ -86,6 +86,16 @@ bool MH5DynamixelBus::initPort()
     }
     RCLCPP_INFO(get_logger(), "using protocol %3.1f", protocol_);
 
+    // Latency timer
+    auto latency_str = info_.hardware_parameters["latency"];
+    if(latency_str == "") {
+        RCLCPP_INFO(get_logger(), "no latency specified, will default to 2 ms");
+        latency_ = 2;
+    } else {
+        latency_ = stoi(latency_str);
+        RCLCPP_INFO(get_logger(), "latency %d ms", latency_);
+    }
+
     // open and configure the serial port
     portHandler_ = new mh5_port_handler::PortHandlerMH5(port_.c_str());
     if (! portHandler_->openPort()) {
@@ -99,7 +109,7 @@ bool MH5DynamixelBus::initPort()
         return false;
     }
     RCLCPP_INFO(get_logger(), "successfully set baud rate %i bps on port %s", baudrate_, port_.c_str());
-    
+
     if (rs485_) {
         if (!portHandler_->setRS485() ) {
             RCLCPP_ERROR(get_logger(), "failed to configure RS485 on port %s", port_.c_str());
@@ -107,6 +117,8 @@ bool MH5DynamixelBus::initPort()
         }
         RCLCPP_INFO(get_logger(), "successfully configured RS485 on port %s", port_.c_str());
     }
+
+    portHandler_->setLatencyTimer(latency_);
 
     // Dynamixel packet handler
     packetHandler_ = dynamixel::PacketHandler::getPacketHandler((float)protocol_);
@@ -138,7 +150,7 @@ bool MH5DynamixelBus::initJoints()
         int id;
         try {
             id = stoi(joint.parameters["id"]);
-        } 
+        }
         catch (std::invalid_argument const& ex) {
             RCLCPP_ERROR(get_logger(), "failed to parse ID of joint %s: %s", joint.name.c_str(), joint.parameters["id"].c_str());
             return false;
@@ -173,7 +185,7 @@ bool MH5DynamixelBus::initJoints()
                     }
                     tokens.push_back(init_string);
                     if (tokens.size() < 3) {
-                        RCLCPP_WARN(get_logger(), "init %s for joint %s incomplete: %s; will be ignored", 
+                        RCLCPP_WARN(get_logger(), "init %s for joint %s incomplete: %s; will be ignored",
                                     init.first.c_str(), joint.name.c_str(), init.second.c_str());
                     }
                     else {
@@ -186,7 +198,7 @@ bool MH5DynamixelBus::initJoints()
                             value = stoi(tokens[2]);
                         }
                         catch(std::invalid_argument const& ex) {
-                            RCLCPP_WARN(get_logger(), "init %s for joint %s cannot be parsed: %s; will be ignored", 
+                            RCLCPP_WARN(get_logger(), "init %s for joint %s cannot be parsed: %s; will be ignored",
                                     init.first.c_str(), joint.name.c_str(), init.second.c_str());
                             continue;
                         }
@@ -201,7 +213,7 @@ bool MH5DynamixelBus::initJoints()
                                 dxl_comm_result = packetHandler_->write4ByteTxRx(portHandler_, id, address, (uint32_t)value, &dxl_error);
                                 break;
                             default:
-                                RCLCPP_WARN(get_logger(), "init %s for joint %s has incorrect number of bytes: %s; will be ignored", 
+                                RCLCPP_WARN(get_logger(), "init %s for joint %s has incorrect number of bytes: %s; will be ignored",
                                         init.first.c_str(), joint.name.c_str(), init.second.c_str());
                                 continue;
                                 break;
@@ -240,7 +252,7 @@ bool MH5DynamixelBus::initSensors()
 //     double rate = stod(info_.hardware_parameters["loop_rates/"+name]);
 //     if (rate == 0.0)
 //     {
-//         RCLCPP_INFO(LOG, "loop %s: no 'loop_rates/%s' available, default to %.1f Hz", 
+//         RCLCPP_INFO(LOG, "loop %s: no 'loop_rates/%s' available, default to %.1f Hz",
 //             name.c_str(), name.c_str(), default_rate);
 //         rate = default_rate;
 //     }
@@ -263,6 +275,8 @@ bool MH5DynamixelBus::setupDynamixelLoops()
             RCLCPP_DEBUG(get_logger(), "pve_read loop added joint %s[%i]", joint.name_.c_str(), joint.id_);
         }
     }
+    pve_read_stats_ = {0, 0, 0.0, 0, 0, 0.0, 0, 0};
+    pve_read_stats_last_reset_ = get_clock()->now();
     RCLCPP_INFO(get_logger(), "pve_read loop configured");
 
     stat_read_ = std::make_unique<dynamixel::GroupSyncRead>(portHandler_, packetHandler_, 224, 6);
@@ -275,7 +289,7 @@ bool MH5DynamixelBus::setupDynamixelLoops()
     std::string rate_str = this->info_.hardware_parameters["status_read_rate"];
     if (rate_str == "") {
         RCLCPP_INFO(get_logger(), "stat_read_rate no specified, will default to 1Hz");
-        status_read_rate_ = 1.0; 
+        status_read_rate_ = 1.0;
     }
     else {
         try {
@@ -288,6 +302,9 @@ bool MH5DynamixelBus::setupDynamixelLoops()
     }
     // stat_read_interval_ = rclcpp::Duration::from_seconds(1.0 / stat_read_rate);
     status_read_last_run_ = get_clock()->now();
+    stat_read_stats_ = {0, 0, 0.0, 0, 0, 0.0, 0, 0};
+    stat_read_stats_last_reset_ = get_clock()->now();
+
     RCLCPP_INFO(get_logger(), "stat_read loop configured");
 
     return true;
@@ -393,8 +410,12 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & /*peri
 
     // position, velocity, effort
     dxl_comm_result = pve_read_->txRxPacket();
+    pve_read_stats_.total_packets++;
+    pve_read_stats_.running_packets++;
     if (dxl_comm_result != COMM_SUCCESS) {
         RCLCPP_DEBUG(get_logger(), "pve SyncRead communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
+        pve_read_stats_.total_errors++;
+        pve_read_stats_.running_errors++;
     }
     else {
         for (auto  & joint : joints_) {
@@ -425,6 +446,20 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & /*peri
             }
         }
     }
+    // update statistics
+    pve_read_stats_.error_rate = pve_read_stats_.total_errors * 100.0 / pve_read_stats_.total_packets;
+    if (time - pve_read_stats_last_reset_ > rclcpp::Duration::from_seconds(60)) {
+        pve_read_stats_last_reset_ = time;
+        pve_read_stats_.last_packets = pve_read_stats_.running_packets;
+        pve_read_stats_.last_errors = pve_read_stats_.running_errors;
+        pve_read_stats_.last_error_rate = pve_read_stats_.running_errors * 100.0 / pve_read_stats_.running_packets;
+        pve_read_stats_.running_packets = 0;
+        pve_read_stats_.running_errors = 0;
+        RCLCPP_INFO(get_logger(), "pve_read stats: (%i, %i, %5.2f%%) (%i, %i, %5.2f%%, %5.2fHz)",
+                    pve_read_stats_.total_packets, pve_read_stats_.total_errors, pve_read_stats_.error_rate,
+                    pve_read_stats_.last_packets, pve_read_stats_.last_errors, pve_read_stats_.last_error_rate,
+                    pve_read_stats_.last_packets / 60.0);
+    }
 
     // status: torque, temperature, voltage, error, led
     rclcpp::Duration actual_passed = time - this->status_read_last_run_;
@@ -432,7 +467,7 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & /*peri
         dxl_comm_result = stat_read_->txRxPacket();
         if (dxl_comm_result != COMM_SUCCESS) {
             RCLCPP_DEBUG(get_logger(), "stat SyncRead communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
-        } 
+        }
         else {
             this->status_read_last_run_ = time;
             for (auto  & joint : joints_) {
@@ -488,7 +523,7 @@ MH5DynamixelBus::write(const rclcpp::Time & time, const rclcpp::Duration & /*per
 // {
 //     int dxl_comm_result = COMM_TX_FAIL;             // Communication result
 //     uint8_t dxl_error = 0;                          // Dynamixel error
-    
+
 //     for (int n=0; n < num_tries; n++)
 //     {
 //         dxl_comm_result = packetHandler_->ping(portHandler_, id, &dxl_error);

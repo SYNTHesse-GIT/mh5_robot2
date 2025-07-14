@@ -83,6 +83,7 @@
           <param name="baudrate">2000000</param>
           <param name="protocol">2.0</param>
           <param name="rs485">yes</param>
+          <param name="latency">2</param>
           <param name="status_read_rate">0.5</param>
         </hardware>
       </xacro:unless>
@@ -126,6 +127,7 @@
           <param name="baudrate">2000000</param>
           <param name="protocol">2.0</param>
           <param name="rs485">yes</param>
+          <param name="latency">2</param>
           <param name="status_read_rate">0.5</param>
         </hardware>
       </xacro:unless>
