@@ -22,20 +22,21 @@
 
 #include "mh5_hardware/port_handler.hpp"
 #include "mh5_hardware/dynamixel_joint.hpp"
+#include "mh5_hardware/dynamixel_loop.hpp"
 
 namespace mh5_hardware
 {
 
-typedef struct {
-  int           total_packets;
-  int           total_errors;
-  double        error_rate;
-  int           last_packets;
-  int           last_errors;
-  double        last_error_rate;
-  int           running_packets;
-  int           running_errors;
-} communication_stats_t;
+// typedef struct {
+//   int           total_packets;
+//   int           total_errors;
+//   double        error_rate;
+//   int           last_packets;
+//   int           last_errors;
+//   double        last_error_rate;
+//   int           running_packets;
+//   int           running_errors;
+// } communication_stats_t;
 
 /**
  * @brief Main class implementing the protocol required by ``ros2_control`` for
@@ -57,6 +58,8 @@ typedef struct {
  */
 class MH5DynamixelBus: public hardware_interface::SystemInterface
 {
+
+public:
   // ~MH5DynamixelBus(); // handles the Ctr-C shutdown
 
   hardware_interface::CallbackReturn on_init(
@@ -82,6 +85,14 @@ class MH5DynamixelBus: public hardware_interface::SystemInterface
   hardware_interface::return_type write(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
+  // mh5_port_handler::PortHandlerMH5* getPortHandler() {return portHandler_; };
+  // dynamixel::PacketHandler* getPacketHandler() {return packetHandler_; };
+
+  int parseIntParam(const std::string & param, const int def, const std::string mu);
+
+  // friend class DynamixelLoop;
+  // friend class PVEReader;
+
 protected:
 
     // communication
@@ -95,24 +106,20 @@ protected:
     mh5_port_handler::PortHandlerMH5    *portHandler_;
     dynamixel::PacketHandler            *packetHandler_;
 
-
-
-
-
     // resources
     int                                 num_joints_;
     std::vector<DynamixelJoint>         joints_{};
 
     // dynamixel loops
-    std::unique_ptr<dynamixel::GroupSyncRead>           pve_read_;
-    communication_stats_t                               pve_read_stats_;
-    rclcpp::Time                                        pve_read_stats_last_reset_;
+    std::unique_ptr<dynamixel::GroupSyncRead>         pve_read_;
+    PacketCounter                                     pve_read_stats_;
+    // rclcpp::Time                                        pve_read_stats_last_reset_;
 
-    std::unique_ptr<dynamixel::GroupSyncRead>           stat_read_;
-    rclcpp::Time                                        status_read_last_run_;
-    double                                              status_read_rate_;
-    communication_stats_t                               stat_read_stats_;
-    rclcpp::Time                                        stat_read_stats_last_reset_;
+    std::unique_ptr<dynamixel::GroupSyncRead>           state_read_;
+    // rclcpp::Time                                        status_read_last_run_;
+    // double                                              status_read_rate_;
+    PacketCounter                                     state_read_stats_;
+    // rclcpp::Time                                        stat_read_stats_last_reset_;
 
     // int                         num_sensors_;
     // std::vector<FootSensor *>   foot_sensors_;

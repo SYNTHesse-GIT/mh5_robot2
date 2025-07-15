@@ -84,7 +84,8 @@
           <param name="protocol">2.0</param>
           <param name="rs485">yes</param>
           <param name="latency">2</param>
-          <param name="status_read_rate">0.5</param>
+          <param name="pve_read_rate">200</param>
+          <param name="state_read_rate">2</param>
         </hardware>
       </xacro:unless>
 
@@ -128,7 +129,8 @@
           <param name="protocol">2.0</param>
           <param name="rs485">yes</param>
           <param name="latency">2</param>
-          <param name="status_read_rate">0.5</param>
+          <param name="pve_read_rate">200</param>
+          <param name="state_read_rate">2</param>
         </hardware>
       </xacro:unless>
 
