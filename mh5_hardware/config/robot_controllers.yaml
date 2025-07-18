@@ -10,6 +10,10 @@ controller_manager:
     joint_status_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
+    torque_command:
+      type: forward_command_controller/ForwardCommandController
+
+
 joint_state_broadcaster:
 
   ros__parameters:
@@ -90,3 +94,39 @@ joint_status_broadcaster:
       - error_overheating
       - error_input_voltage
       - led
+
+
+torque_command:
+
+  ros__parameters:
+
+    type: forward_command_controller/ForwardCommandController
+    update_rate: 1
+
+    joints:
+      - head_p
+      - head_y
+      - l_sho_p
+      - l_sho_r
+      - l_elb_r
+      - l_elb_p
+      - l_gripper
+      - r_sho_p
+      - r_sho_r
+      - r_elb_r
+      - r_elb_p
+      - r_gripper
+      - l_hip_r
+      - l_hip_p
+      - l_kne_p
+      - l_kne_y
+      - l_ank_p
+      - l_ank_r
+      - r_hip_r
+      - r_hip_p
+      - r_kne_p
+      - r_kne_y
+      - r_ank_p
+      - r_ank_r
+
+    interface_name: torque_enable

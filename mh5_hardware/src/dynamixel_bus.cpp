@@ -297,6 +297,10 @@ bool MH5DynamixelBus::setupDynamixelLoops()
     state_read_stats_ = PacketCounter(rate, horiz, get_clock()->now());
     RCLCPP_INFO(get_logger(), "state_read loop configured");
 
+    rate = parseIntParam("torque_write_rate", 1, "Hz");
+    horiz = parseIntParam("torque_write_horizon", 60, "s");
+    torque_write_stats_ = PacketCounter(1, 60, get_clock()->now());
+
     return true;
 }
 
@@ -337,6 +341,9 @@ MH5DynamixelBus::export_command_interfaces()
 {
         std::vector<hardware_interface::CommandInterface> command_interfaces;
 
+        for (auto & joint : joints_) {
+            command_interfaces.emplace_back(hardware_interface::CommandInterface(joint.name_, "torque_enable", &joint.torque_command_));
+        }
         // for (auto resource : resources_) {
         //     resource->add_command_interfaces(&command_interfaces);
         // }
@@ -419,6 +426,9 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period
                     else {
                         int32_t pos = pve_read_->getData(joint.id_, 132, 4);
                         joint.position_ = (pos - 2047) * 0.001533980787886;
+                        if (!joint.torque_enable_) {
+                            joint.position_command_ = joint.position_;
+                        }
                     }
 
                     if (! pve_read_->isAvailable(joint.id_, 128, 4)) {
@@ -508,8 +518,37 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period
 
 
 hardware_interface::return_type
-MH5DynamixelBus::write(const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
+MH5DynamixelBus::write(const rclcpp::Time & time, const rclcpp::Duration & period)
 {
+    uint8_t dxl_error;
+    // torque enable
+    // because this is one register and is very low frequency we simply write with normal write_register
+    if (torque_write_stats_.shouldRun(time, period)) {
+        for (auto & joint : joints_) {
+            if (joint.torque_command_ != joint.torque_enable_) {
+                torque_write_stats_.addRun(time);
+                if (packetHandler_->write1ByteTxRx(portHandler_, joint.id_, 64, 0, &dxl_error) != COMM_SUCCESS) {
+                    torque_write_stats_.addErr();
+                    RCLCPP_WARN(get_logger(), "failed to deactivate joint %s; communication error", joint.name_.c_str());
+                }
+                else if (dxl_error != 0) {
+                    RCLCPP_WARN(get_logger(), "failed to deactivate joint %s; device error %u", joint.name_.c_str(), dxl_error);
+                    // this does not count as a communication error, hence we do not increment the counters
+                }
+                else {
+                    RCLCPP_INFO(get_logger(), "joint %s[%i] deactivated", joint.name_.c_str(), joint.id_);
+                }
+            }
+        }
+    }
+    if (torque_write_stats_.shouldReset(time)) {
+        torque_write_stats_.reset(time);
+        RCLCPP_INFO(get_logger(), "torque_write stats: (%i, %i, %5.2f%%) (%i, %i, %5.2f%%, %5.2fHz)",
+                torque_write_stats_.total_packets_, torque_write_stats_.total_errors_, torque_write_stats_.error_rate_,
+                torque_write_stats_.last_packets_, torque_write_stats_.last_errors_, torque_write_stats_.last_error_rate_,
+                (float) torque_write_stats_.last_packets_ / torque_write_stats_.horizon_);
+    }
+
     return hardware_interface::return_type::OK;
 }
 

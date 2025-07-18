@@ -54,6 +54,7 @@ def generate_launch_description():
     controllers = [
         "joint_state_broadcaster",
         "joint_status_broadcaster",
+        "torque_command",
     ]
 
     remap = {

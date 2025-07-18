@@ -113,13 +113,11 @@ protected:
     // dynamixel loops
     std::unique_ptr<dynamixel::GroupSyncRead>         pve_read_;
     PacketCounter                                     pve_read_stats_;
-    // rclcpp::Time                                        pve_read_stats_last_reset_;
 
-    std::unique_ptr<dynamixel::GroupSyncRead>           state_read_;
-    // rclcpp::Time                                        status_read_last_run_;
-    // double                                              status_read_rate_;
+    std::unique_ptr<dynamixel::GroupSyncRead>         state_read_;
     PacketCounter                                     state_read_stats_;
-    // rclcpp::Time                                        stat_read_stats_last_reset_;
+
+    PacketCounter                                     torque_write_stats_;
 
     // int                         num_sensors_;
     // std::vector<FootSensor *>   foot_sensors_;
