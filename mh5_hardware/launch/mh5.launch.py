@@ -50,28 +50,38 @@ def generate_launch_description():
         output="both",
         parameters=[{"robot_description": robot_description}],
     )
+
     # controllers
-    controllers = [
-        "joint_state_broadcaster",
-        "joint_status_broadcaster",
-        "torque_command",
-    ]
-
-    remap = {
-        "joint_status_broadcaster": "-r dynamic_joint_states:=joint_statuses"
-    }
-
     controller_nodes = [
         Node(
             package="controller_manager",
             executable="spawner",
             arguments=[
-                controller_name,
+                "joint_state_broadcaster",
                 "--param-file", robot_controllers_yaml,
-                # "--controller-ros-args", remap.get(controller_name,"")
             ],
-        )
-        for controller_name in controllers
+        ),
+
+        Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=[
+                "joint_info_broadcaster",
+                "--param-file", robot_controllers_yaml,
+                "--controller-ros-args",
+                "-r dynamic_joint_states:=joint_info",
+            ],
+        ),
+
+        Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=[
+                "torque",
+                "--param-file", robot_controllers_yaml,
+            ],
+        ),
+
     ]
 
     nodes = [

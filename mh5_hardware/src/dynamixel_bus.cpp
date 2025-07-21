@@ -157,6 +157,15 @@ bool MH5DynamixelBus::initJoints()
         }
         auto j = DynamixelJoint(joint.name, id);
 
+        if (joint.parameters["model"] == "") {
+            RCLCPP_ERROR(get_logger(), "missing model for joint %s", joint.name.c_str());
+            return false;
+        }
+        if (joint.parameters["model"] != "XL430" && joint.parameters["model"] != "XL330") {
+            RCLCPP_ERROR(get_logger(), "unknown model for joint %s: %s", joint.name.c_str(), joint.parameters["model"].c_str());
+            return false;
+        }
+        j.model_ = joint.parameters["model"];
         int dxl_comm_result;
         uint8_t dxl_error = 0;
         if (packetHandler_->ping(portHandler_, id, &dxl_error) != COMM_SUCCESS) {
@@ -285,17 +294,22 @@ bool MH5DynamixelBus::setupDynamixelLoops()
     RCLCPP_INFO(get_logger(), "pve_read loop configured");
 
     // dynamixel state (error, led, active, temperature, voltage)
-    state_read_ = std::make_unique<dynamixel::GroupSyncRead>(portHandler_, packetHandler_, 224, 6);
+    info_read_ = std::make_unique<dynamixel::GroupBulkRead>(portHandler_, packetHandler_);
     for (auto & joint : joints_) {
         if (joint.available_) {
-            state_read_->addParam(joint.id_);
-            RCLCPP_DEBUG(get_logger(), "stat_read loop added joint %s[%i]", joint.name_.c_str(), joint.id_);
+            if (joint.model_ == "XL430") {
+                info_read_->addParam(joint.id_, 224, 6);
+            }
+            if (joint.model_ == "XL330") {
+                info_read_->addParam(joint.id_, 208, 6);
+            }
+            RCLCPP_DEBUG(get_logger(), "info_read loop added joint %s[%i]", joint.name_.c_str(), joint.id_);
         }
     }
-    rate = parseIntParam("state_read_rate", 1, "Hz");
-    horiz = parseIntParam("state_read_horizon", 60, "s");
-    state_read_stats_ = PacketCounter(rate, horiz, get_clock()->now());
-    RCLCPP_INFO(get_logger(), "state_read loop configured");
+    rate = parseIntParam("info_read_rate", 1, "Hz");
+    horiz = parseIntParam("info_read_horizon", 60, "s");
+    info_read_stats_ = PacketCounter(rate, horiz, get_clock()->now());
+    RCLCPP_INFO(get_logger(), "info_read loop configured");
 
     rate = parseIntParam("torque_write_rate", 1, "Hz");
     horiz = parseIntParam("torque_write_horizon", 60, "s");
@@ -459,28 +473,43 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period
     }
 
     // status: torque, temperature, voltage, error, led
-    if (state_read_stats_.shouldRun(time, period)) {
-        state_read_stats_.addRun(time);
-        dxl_comm_result = state_read_->txRxPacket();
+    if (info_read_stats_.shouldRun(time, period)) {
+        info_read_stats_.addRun(time);
+        dxl_comm_result = info_read_->txRxPacket();
         if (dxl_comm_result != COMM_SUCCESS) {
-            RCLCPP_DEBUG(get_logger(), "state SyncRead communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
-            state_read_stats_.addErr();
+            RCLCPP_DEBUG(get_logger(), "info_read communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
+            info_read_stats_.addErr();
         }
         else {
             for (auto  & joint : joints_) {
                 if (joint.available_) {
-                    if (! state_read_->isAvailable(joint.id_, 224, 1)) {
-                        RCLCPP_DEBUG(get_logger(), "state SyncRead getting torque for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                    // data indirect starts at different address
+                    int data_start;
+                    if (joint.model_ == "XL330") {
+                        data_start = 208;
+                    }
+                    else if (joint.model_ == "XL430") {
+                        data_start = 224;
                     }
                     else {
-                        joint.torque_enable_ = state_read_->getData(joint.id_, 224, 1);
+                        RCLCPP_ERROR(
+                            get_logger(),
+                            "unexpected servo model %s encountered when processing info_read loop. This should not happen.",
+                            joint.name_.c_str());
+                        continue;
+                    }
+                    if (! info_read_->isAvailable(joint.id_, data_start, 1)) {
+                        RCLCPP_DEBUG(get_logger(), "info_read getting torque for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                    }
+                    else {
+                        joint.torque_enable_ = info_read_->getData(joint.id_, data_start, 1);
                     }
 
-                    if (! state_read_->isAvailable(joint.id_, 225, 1)) {
-                        RCLCPP_DEBUG(get_logger(), "state SyncRead getting hwerr for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                    if (! info_read_->isAvailable(joint.id_, data_start+1, 1)) {
+                        RCLCPP_DEBUG(get_logger(), "info_read getting hwerr for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                     }
                     else {
-                        uint8_t data = state_read_->getData(joint.id_, 225, 1);
+                        uint8_t data = info_read_->getData(joint.id_, data_start+1, 1);
                         joint.error_input_voltage_ = data & 1<<0;
                         joint.error_overheating_ = data & 1<<2;
                         joint.error_motor_encoder_ = data & 1<<3;
@@ -488,28 +517,35 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period
                         joint.error_overload_ = data & 1<<5;
                     }
 
-                    if (! state_read_->isAvailable(joint.id_, 226, 2)) {
-                        RCLCPP_DEBUG(get_logger(), "state SyncRead getting voltage for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                    if (! info_read_->isAvailable(joint.id_, data_start+2, 2)) {
+                        RCLCPP_DEBUG(get_logger(), "info_read getting voltage for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                     }
                     else {
-                        joint.voltage_ = state_read_->getData(joint.id_, 226, 2);
+                        joint.voltage_ = info_read_->getData(joint.id_, data_start+2, 2);
                     }
 
-                    if (! state_read_->isAvailable(joint.id_, 228, 1)) {
-                        RCLCPP_DEBUG(get_logger(), "state SyncRead getting temp for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                    if (! info_read_->isAvailable(joint.id_, data_start+4, 1)) {
+                        RCLCPP_DEBUG(get_logger(), "info_read getting temp for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
                     }
                     else {
-                        joint.temperature_ = state_read_->getData(joint.id_, 228, 1);
+                        joint.temperature_ = info_read_->getData(joint.id_, data_start+4, 1);
+                    }
+
+                    if (! info_read_->isAvailable(joint.id_, data_start+5, 1)) {
+                        RCLCPP_DEBUG(get_logger(), "info_read getting led for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+                    }
+                    else {
+                        joint.led_ = info_read_->getData(joint.id_, data_start+5, 1);
                     }
                 }
             }
         }
-        if (state_read_stats_.shouldReset(time)) {
-            state_read_stats_.reset(time);
+        if (info_read_stats_.shouldReset(time)) {
+            info_read_stats_.reset(time);
             RCLCPP_INFO(get_logger(), "state_read stats: (%i, %i, %5.2f%%) (%i, %i, %5.2f%%, %5.2fHz)",
-                            state_read_stats_.total_packets_, state_read_stats_.total_errors_, state_read_stats_.error_rate_,
-                            state_read_stats_.last_packets_, state_read_stats_.last_errors_, state_read_stats_.last_error_rate_,
-                            (float) state_read_stats_.last_packets_ / state_read_stats_.horizon_);
+                            info_read_stats_.total_packets_, info_read_stats_.total_errors_, info_read_stats_.error_rate_,
+                            info_read_stats_.last_packets_, info_read_stats_.last_errors_, info_read_stats_.last_error_rate_,
+                            (float) info_read_stats_.last_packets_ / info_read_stats_.horizon_);
         }
     }
 
@@ -525,18 +561,25 @@ MH5DynamixelBus::write(const rclcpp::Time & time, const rclcpp::Duration & perio
     // because this is one register and is very low frequency we simply write with normal write_register
     if (torque_write_stats_.shouldRun(time, period)) {
         for (auto & joint : joints_) {
+            if (joint.torque_command_ < 0.0) {
+                // this acts like a "leave in place"
+                continue;
+            }
+            if (joint.torque_command_ > 0.0) {
+                joint.torque_command_ = 1.0;
+            }
             if (joint.torque_command_ != joint.torque_enable_) {
                 torque_write_stats_.addRun(time);
-                if (packetHandler_->write1ByteTxRx(portHandler_, joint.id_, 64, 0, &dxl_error) != COMM_SUCCESS) {
+                if (packetHandler_->write1ByteTxRx(portHandler_, joint.id_, 64, (uint8_t)joint.torque_command_, &dxl_error) != COMM_SUCCESS) {
                     torque_write_stats_.addErr();
-                    RCLCPP_WARN(get_logger(), "failed to deactivate joint %s; communication error", joint.name_.c_str());
+                    RCLCPP_WARN(get_logger(), "failed to toggle torque for joint %s; communication error", joint.name_.c_str());
                 }
                 else if (dxl_error != 0) {
-                    RCLCPP_WARN(get_logger(), "failed to deactivate joint %s; device error %u", joint.name_.c_str(), dxl_error);
+                    RCLCPP_WARN(get_logger(), "failed to toggle torque for joint %s; device error %u", joint.name_.c_str(), dxl_error);
                     // this does not count as a communication error, hence we do not increment the counters
                 }
                 else {
-                    RCLCPP_INFO(get_logger(), "joint %s[%i] deactivated", joint.name_.c_str(), joint.id_);
+                    RCLCPP_INFO(get_logger(), "joint %s[%i] %s", joint.name_.c_str(), joint.id_, joint.torque_command_ == 0 ? "deactivated":"activated" );
                 }
             }
         }

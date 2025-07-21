@@ -17,7 +17,7 @@
 
 #include "controller_interface/controller_interface.hpp"
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
-#include "realtime_tools/realtime_publisher.h"
+#include "realtime_tools/realtime_publisher.hpp"
 
 #include "diagnostic_message_broadcaster_parameters.hpp"
 
@@ -32,7 +32,7 @@ public:
     controller_interface::CallbackReturn on_configure(const rclcpp_lifecycle::State & previous_state) override;
     controller_interface::CallbackReturn on_activate(const rclcpp_lifecycle::State & previous_state) override;
     controller_interface::CallbackReturn on_deactivate(const rclcpp_lifecycle::State & previous_state) override;
-    controller_interface::return_type update(const rclcpp::Time & time, const rclcpp::Duration & period) override; 
+    controller_interface::return_type update(const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
 protected:
 

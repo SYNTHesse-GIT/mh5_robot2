@@ -114,8 +114,8 @@ protected:
     std::unique_ptr<dynamixel::GroupSyncRead>         pve_read_;
     PacketCounter                                     pve_read_stats_;
 
-    std::unique_ptr<dynamixel::GroupSyncRead>         state_read_;
-    PacketCounter                                     state_read_stats_;
+    std::unique_ptr<dynamixel::GroupBulkRead>         info_read_;
+    PacketCounter                                     info_read_stats_;
 
     PacketCounter                                     torque_write_stats_;
 
