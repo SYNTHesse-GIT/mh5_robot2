@@ -25,6 +25,7 @@ struct DynamixelJoint
     double                              error_overheating_;
     double                              error_input_voltage_;
     double                              led_;
+    double                              moving_;
 
 
     double                              position_command_;

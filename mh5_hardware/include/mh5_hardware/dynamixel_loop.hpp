@@ -18,7 +18,8 @@ struct PacketCounter
     : rate_{rate}, horizon_{horizon}, last_run_{time_init}, last_reset_{time_init},
       total_packets_{0}, total_errors_{0}, error_rate_{0.0},
       last_packets_{0}, last_errors_{0}, last_error_rate_{0.0},
-      running_packets_{0}, running_errors_{0}
+      running_packets_{0}, running_errors_{0},
+      slice_{0}
     {}
 
     void addRun(const rclcpp::Time & time)
@@ -72,6 +73,7 @@ struct PacketCounter
     double           last_error_rate_;
     int              running_packets_;
     int              running_errors_;
+    int              slice_;              // can be used by loops for different reasons
 };
 
 

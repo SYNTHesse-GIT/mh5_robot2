@@ -114,7 +114,23 @@ protected:
     std::unique_ptr<dynamixel::GroupSyncRead>         pve_read_;
     PacketCounter                                     pve_read_stats_;
 
-    std::unique_ptr<dynamixel::GroupBulkRead>         info_read_;
+    /**
+     * for reading information about the state of the device we have two separate
+     * SyncReads because the data is spread in the registry and we cannot use the
+     * indirect registers for all data because of the different treatment between
+     * XL430 and XL330. So the solution is:
+     * - for temp and voltage we will use one SyncRead that will read all devices
+     * - for torque, led, hwerr and moving we setup indirect registers in the only 4
+     * registers that overlap between XL430 and XL330: data regs 224-227. These are
+     * configured in .XACRO file differently for XL430 and XL330 servos.
+     * Now the only problem is that runing both SyncReads in the same time in a read()
+     * loop will most likely break the allotted time and ros control framework will
+     * issue overrun warnings everytime the info_read is run. For this we will
+     * alternate between the info1_read and info2_read using the slice_ parameter in the
+     * info_read_stats.
+     */
+    std::unique_ptr<dynamixel::GroupSyncRead>         info1_read_;    // temp, voltage
+    std::unique_ptr<dynamixel::GroupSyncRead>         info2_read_;    // torque, hwerr, led, moving
     PacketCounter                                     info_read_stats_;
 
     PacketCounter                                     torque_write_stats_;
@@ -174,6 +190,10 @@ protected:
     bool setupDynamixelLoops();
 
     // bool ping(const uint8_t id, const int num_tries=5);
+
+    bool read_pve();
+    bool read_info1();
+    bool read_info2();
 
 };
 
