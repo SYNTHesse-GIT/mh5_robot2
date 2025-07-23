@@ -298,10 +298,10 @@ bool MH5DynamixelBus::setupDynamixelLoops()
     }
     int info_rate = parseIntParam("info_read_rate", 1, "Hz");
     int horiz = parseIntParam("info_read_horizon", 60, "s");
-    // we use info_rate*2 to account for the swapping between the two SyncReads
-    info_read_stats_ = PacketCounter(info_rate*2, horiz, get_clock()->now());
-    RCLCPP_INFO(get_logger(), "info_read loop configured");
-    RCLCPP_INFO(get_logger(), "technical rate: %i", info_read_stats_.rate_);
+    info1_read_stats_ = PacketCounter(info_rate, horiz, get_clock()->now());
+    info2_read_stats_ = PacketCounter(info_rate, horiz, get_clock()->now());
+    RCLCPP_INFO(get_logger(), "info_read loops configured");
+
 
     // position, velocity, effort
     pve_read_ = std::make_unique<dynamixel::GroupSyncRead>(portHandler_, packetHandler_, 126, 10);
@@ -314,9 +314,8 @@ bool MH5DynamixelBus::setupDynamixelLoops()
     int pve_rate = parseIntParam("pve_read_rate", 100, "Hz");
     horiz = parseIntParam("pve_read_horizon", 60, "s");
     // we increase the rate to accomodate the loops skipped due to info_read
-    pve_read_stats_ = PacketCounter(pve_rate + info_rate * 2, horiz, get_clock()->now());
+    pve_read_stats_ = PacketCounter(pve_rate, horiz, get_clock()->now());
     RCLCPP_INFO(get_logger(), "pve_read loop configured");
-    RCLCPP_INFO(get_logger(), "technical rate: %i", pve_read_stats_.rate_);
 
     int torque_rate = parseIntParam("torque_write_rate", 1, "Hz");
     horiz = parseIntParam("torque_write_horizon", 60, "s");
@@ -429,49 +428,50 @@ MH5DynamixelBus::on_deactivate(const rclcpp_lifecycle::State & /*previous_state*
 hardware_interface::return_type
 MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period)
 {
-    // status: torque, temperature, voltage, error, led
-    if (info_read_stats_.shouldRun(time, period)) {
-        // to reduce the impact on other read loops we use the counter_ to only run half of the SyncReads
-        if (info_read_stats_.slice_ % 2 == 0) {
-            info_read_stats_.addRun(time);
-            bool result = read_info1();
-            if (!result) {
-                info_read_stats_.addErr();
-            }
-         }
-        else {
-            info_read_stats_.addRun(time);
-            bool result = read_info2();
-            if (!result) {
-                info_read_stats_.addErr();
-            }
-        }
-        info_read_stats_.slice_++;
-        if (info_read_stats_.shouldReset(time)) {
-            info_read_stats_.reset(time);
-            RCLCPP_INFO(get_logger(), "info_read stats: (%i, %i, %5.2f%%) (%i, %i, %5.2f%%, %5.2fHz)",
-                            info_read_stats_.total_packets_, info_read_stats_.total_errors_, info_read_stats_.error_rate_,
-                            info_read_stats_.last_packets_, info_read_stats_.last_errors_, info_read_stats_.last_error_rate_,
-                            (float) info_read_stats_.last_packets_ / info_read_stats_.horizon_);
-        }
-        // to avoid overrunning the time alloted for the loop we will return here and skip the (most more frequent) pve_read
-        // that will be run next time
-        return hardware_interface::return_type::OK;
-    }
+    bool previous_run = false;
 
     // position, velocity, effort
-    if (pve_read_stats_.shouldRun(time, period)) {
+    if (pve_read_stats_.shouldRun(time, period, previous_run)) {
         pve_read_stats_.addRun(time);
         bool result = read_pve();
         if (! result) {
             pve_read_stats_.addErr();
         }
+        previous_run = true;
         if (pve_read_stats_.shouldReset(time)) {
             pve_read_stats_.reset(time);
             RCLCPP_INFO(get_logger(), "pve_read stats: (%i, %i, %5.2f%%) (%i, %i, %5.2f%%, %5.2fHz)",
                             pve_read_stats_.total_packets_, pve_read_stats_.total_errors_, pve_read_stats_.error_rate_,
                             pve_read_stats_.last_packets_, pve_read_stats_.last_errors_, pve_read_stats_.last_error_rate_,
                             (float) pve_read_stats_.last_packets_ / pve_read_stats_.horizon_);
+        }
+    }
+
+    // info: temperature, voltage
+    if (info1_read_stats_.shouldRun(time, period, previous_run)) {
+        info1_read_stats_.addRun(time);
+        bool result = read_info1();
+        if (!result) {
+            info1_read_stats_.addErr();
+        }
+        previous_run = true;
+        if (info1_read_stats_.shouldReset(time)) {
+            info1_read_stats_.reset(time);
+            info1_read_stats_.log_info(get_logger(), "info1_read");
+        }
+    }
+
+    // info: torque, led, hwerr, moving
+    if(info2_read_stats_.shouldRun(time, period, previous_run)) {
+        info2_read_stats_.addRun(time);
+        bool result = read_info2();
+        if (!result) {
+            info2_read_stats_.addErr();
+        }
+        previous_run = true;
+        if (info2_read_stats_.shouldReset(time)) {
+            info2_read_stats_.reset(time);
+            info2_read_stats_.log_info(get_logger(), "info2_read");
         }
     }
 
@@ -612,7 +612,7 @@ MH5DynamixelBus::write(const rclcpp::Time & time, const rclcpp::Duration & perio
     uint8_t dxl_error;
     // torque enable
     // because this is one register and is very low frequency we simply write with normal write_register
-    if (torque_write_stats_.shouldRun(time, period)) {
+    if (torque_write_stats_.shouldRun(time, period, false)) {
         for (auto & joint : joints_) {
             if (joint.torque_command_ < 0.0) {
                 // this acts like a "leave in place"

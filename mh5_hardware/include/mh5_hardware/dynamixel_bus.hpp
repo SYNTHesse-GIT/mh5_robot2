@@ -123,15 +123,11 @@ protected:
      * - for torque, led, hwerr and moving we setup indirect registers in the only 4
      * registers that overlap between XL430 and XL330: data regs 224-227. These are
      * configured in .XACRO file differently for XL430 and XL330 servos.
-     * Now the only problem is that runing both SyncReads in the same time in a read()
-     * loop will most likely break the allotted time and ros control framework will
-     * issue overrun warnings everytime the info_read is run. For this we will
-     * alternate between the info1_read and info2_read using the slice_ parameter in the
-     * info_read_stats.
      */
     std::unique_ptr<dynamixel::GroupSyncRead>         info1_read_;    // temp, voltage
+    PacketCounter                                     info1_read_stats_;
     std::unique_ptr<dynamixel::GroupSyncRead>         info2_read_;    // torque, hwerr, led, moving
-    PacketCounter                                     info_read_stats_;
+    PacketCounter                                     info2_read_stats_;
 
     PacketCounter                                     torque_write_stats_;
 
