@@ -8,27 +8,30 @@
       <param name="init_${name}">${address},${length},${value} </param>
     </xacro:macro>
 
-    <xacro:macro name="common_init" params="direction">
+    <xacro:macro name="common_init" params="direction offset max_voltage max_velocity">
       <xacro:register_init name="return_delay" address="9" length="1" value="0" />
       <xacro:register_init name="drive_mode" address="10" length="1" value="${direction}" />
       <xacro:register_init name="operating_mode" address="11" length="1" value="3" />
+      <xacro:register_init name="homing_offset" address="20" length="4" value="${offset}" />
       <xacro:register_init name="temp_limit" address="31" length="1" value="75" />
-      <xacro:register_init name="volt_limit" address="32" length="2" value="135" />
-      <xacro:register_init name="vel_limit" address="44" length="4" value="1023" />
+      <xacro:register_init name="volt_limit" address="32" length="2" value="${max_voltage}" />
+      <xacro:register_init name="vel_limit" address="44" length="4" value="${max_velocity}" />
       <xacro:register_init name="min_pos" address="52" length="4" value="0" />
       <xacro:register_init name="max_pos" address="48" length="4" value="4095" />
-      <xacro:register_init name="indirect_torque" address="168" length="2" value="64" />
-      <xacro:register_init name="indirect_hwerr" address="170" length="2" value="70" />
-      <xacro:register_init name="indirect_volt_l" address="172" length="2" value="144" />
-      <xacro:register_init name="indirect_volt_h" address="174" length="2" value="145" />
-      <xacro:register_init name="indirect_temp" address="176" length="2" value="146" />
-      <xacro:register_init name="indirect_led" address="178" length="2" value="65" />
     </xacro:macro>
 
-    <xacro:macro name="mh5_servo" params="joint_name id direction">
+    <xacro:macro name="xl430_servo" params="joint_name id direction offset=0">
       <joint name="${joint_name}">
         <param name="id">${id}</param>
-        <xacro:common_init direction="${direction}" />
+        <param name="model">XL430</param>
+        <xacro:common_init direction="${direction}" offset="${offset}" max_voltage="135" max_velocity="1023" />
+        <!-- only 4 indirect registers are overlapping in data address between XL430 and XL330:
+        224 - 227, but they have to be setup with different address setup, hence differenct
+        initialization codes -->
+        <xacro:register_init name="indirect_torque" address="168" length="2" value="64" />
+        <xacro:register_init name="indirect_led" address="170" length="2" value="65" />
+        <xacro:register_init name="indirect_hwerr" address="172" length="2" value="70" />
+        <xacro:register_init name="indirect_moving" address="174" length="2" value="122" />
         <state_interface name="position" />
         <state_interface name="velocity" />
         <state_interface name="effort" />
@@ -41,10 +44,36 @@
         <state_interface name="error_overheating" />
         <state_interface name="error_input_voltage" />
         <state_interface name="led" />
+        <command_interface name ="torque_enable" />
       </joint>
     </xacro:macro>
 
-    <ros2_control name="upper_body" type="system">
+    <xacro:macro name="xl330_servo" params="joint_name id direction offset=0">
+      <joint name="${joint_name}">
+        <param name="id">${id}</param>
+        <param name="model">XL330</param>
+        <xacro:common_init direction="${direction}" offset="${offset}" max_voltage="70" max_velocity="445" />
+        <xacro:register_init name="indirect_torque" address="200" length="2" value="64" />
+        <xacro:register_init name="indirect_led" address="202" length="2" value="65" />
+        <xacro:register_init name="indirect_hwerr" address="204" length="2" value="70" />
+        <xacro:register_init name="indirect_moving" address="206" length="2" value="122" />
+        <state_interface name="position" />
+        <state_interface name="velocity" />
+        <state_interface name="effort" />
+        <state_interface name="temperature" />
+        <state_interface name="voltage" />
+        <state_interface name="torque_enable" />
+        <state_interface name="error_overload" />
+        <state_interface name="error_electrical_shock" />
+        <state_interface name="error_motor_encoder" />
+        <state_interface name="error_overheating" />
+        <state_interface name="error_input_voltage" />
+        <state_interface name="led" />
+        <command_interface name ="torque_enable" />
+      </joint>
+    </xacro:macro>
+
+    <ros2_control name="upper_body" type="system" is_async="true" thread_priority="80">
 
       <xacro:if value="${use_mock_hardware}">
         <hardware>
@@ -56,24 +85,74 @@
       <xacro:unless value="${use_mock_hardware}">
         <hardware>
           <plugin>mh5_hardware/MH5DynamixelBus</plugin>
-          <param name="debug">yes</param>
+          <param name="debug">no</param>
           <param name="port">/dev/ttySC0</param>
           <param name="baudrate">2000000</param>
           <param name="protocol">2.0</param>
           <param name="rs485">yes</param>
+          <param name="latency">2</param>
+          <param name="pve_read_rate">200</param>
+          <param name="info_read_rate">2</param>
         </hardware>
       </xacro:unless>
 
-      <xacro:mh5_servo joint_name="l_sho_p" id="34" direction="1" />
-      <xacro:mh5_servo joint_name="l_sho_r" id="33" direction="1" />
-      <xacro:mh5_servo joint_name="l_elb_y" id="32" direction="1" />
-      <xacro:mh5_servo joint_name="l_elb_p" id="31" direction="0" />
-      <xacro:mh5_servo joint_name="r_sho_p" id="44" direction="0" />
-      <xacro:mh5_servo joint_name="r_sho_r" id="43" direction="0" />
-      <xacro:mh5_servo joint_name="r_elb_y" id="42" direction="0" />
-      <xacro:mh5_servo joint_name="r_elb_p" id="41" direction="1" />
-      <xacro:mh5_servo joint_name="head_p" id="51" direction="0" />
-      <xacro:mh5_servo joint_name="head_y" id="52" direction="0" />
+      <xacro:xl430_servo joint_name="l_sho_p" id="34" direction="1" />
+      <xacro:xl430_servo joint_name="l_sho_r" id="33" direction="1" />
+      <xacro:xl430_servo joint_name="l_elb_r" id="32" direction="1" />
+      <xacro:xl430_servo joint_name="l_elb_p" id="31" direction="1" />
+      <xacro:xl330_servo joint_name="l_gripper" id="30" direction="0" />
+      <xacro:xl430_servo joint_name="r_sho_p" id="44" direction="0" />
+      <xacro:xl430_servo joint_name="r_sho_r" id="43" direction="0" />
+      <xacro:xl430_servo joint_name="r_elb_r" id="42" direction="0" />
+      <xacro:xl430_servo joint_name="r_elb_p" id="41" direction="0" />
+      <xacro:xl330_servo joint_name="r_gripper" id="40" direction="1" />
+      <xacro:xl430_servo joint_name="head_p" id="51" direction="0" />
+      <xacro:xl430_servo joint_name="head_y" id="52" direction="0" />
+
+
+      <!-- <sensor name="pve_communication">
+        <param name="rate">200</param>
+        <state_interface name="packets" />
+        <state_interface name="errors" />
+      </sensor> -->
+
+    </ros2_control>
+
+    <ros2_control name="lower_body" type="system"  is_async="true" thread_priority="80">
+
+      <xacro:if value="${use_mock_hardware}">
+        <hardware>
+          <plugin>mock_components/GenericSystem</plugin>
+          <param name="calculate_dynamics">true</param>
+        </hardware>
+      </xacro:if>
+
+      <xacro:unless value="${use_mock_hardware}">
+        <hardware>
+          <plugin>mh5_hardware/MH5DynamixelBus</plugin>
+          <param name="debug">no</param>
+          <param name="port">/dev/ttySC1</param>
+          <param name="baudrate">2000000</param>
+          <param name="protocol">2.0</param>
+          <param name="rs485">yes</param>
+          <param name="latency">2</param>
+          <param name="pve_read_rate">200</param>
+          <param name="info_read_rate">2</param>
+        </hardware>
+      </xacro:unless>
+
+      <xacro:xl430_servo joint_name="l_hip_r" id="16" direction="1" />
+      <xacro:xl430_servo joint_name="l_hip_p" id="15" direction="1" />
+      <xacro:xl430_servo joint_name="l_kne_p" id="14" direction="1" offset="-1024" />   <!--  offset pi/2!  -->
+      <xacro:xl430_servo joint_name="l_kne_y" id="13" direction="1" />
+      <xacro:xl430_servo joint_name="l_ank_p" id="12" direction="1" />
+      <xacro:xl430_servo joint_name="l_ank_r" id="11" direction="0" />
+      <xacro:xl430_servo joint_name="r_hip_r" id="26" direction="0" />
+      <xacro:xl430_servo joint_name="r_hip_p" id="25" direction="1" />
+      <xacro:xl430_servo joint_name="r_kne_p" id="24" direction="1" offset="-1024" />   <!--  offset pi/2!  -->
+      <xacro:xl430_servo joint_name="r_kne_y" id="23" direction="0" />
+      <xacro:xl430_servo joint_name="r_ank_p" id="22" direction="1" />
+      <xacro:xl430_servo joint_name="r_ank_r" id="21" direction="1" />
 
       <!-- <sensor name="pve_communication">
         <param name="rate">200</param>

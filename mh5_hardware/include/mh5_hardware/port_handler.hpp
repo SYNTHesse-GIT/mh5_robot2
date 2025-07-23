@@ -49,7 +49,7 @@ class PortHandlerMH5: public PARENT
 {
     public:
 
-        PortHandlerMH5(const char *port_name) : PARENT(port_name) {}
+        PortHandlerMH5(const char *port_name) : PARENT(port_name), latency_timer_(0) {}
 
         bool setRS485() {
     #if defined (__linux__)
@@ -70,6 +70,17 @@ class PortHandlerMH5: public PARENT
     #endif
         }
 
+        void setLatencyTimer(int latency) {latency_timer_ = latency; }
+
+        void setPacketTimeout(uint16_t packet_length)
+        {
+            packet_start_time_  = getCurrentTime();
+            packet_timeout_     = (tx_time_per_byte * (double)packet_length) + latency_timer_;
+        }
+
+    private:
+
+        int     latency_timer_;
 };
 
 }

@@ -22,31 +22,45 @@
 
 #include "mh5_hardware/port_handler.hpp"
 #include "mh5_hardware/dynamixel_joint.hpp"
+#include "mh5_hardware/dynamixel_loop.hpp"
 
 namespace mh5_hardware
 {
 
+// typedef struct {
+//   int           total_packets;
+//   int           total_errors;
+//   double        error_rate;
+//   int           last_packets;
+//   int           last_errors;
+//   double        last_error_rate;
+//   int           running_packets;
+//   int           running_errors;
+// } communication_stats_t;
+
 /**
  * @brief Main class implementing the protocol required by ``ros2_control`` for
  * providing access to the robot hardware.
- * 
+ *
  * This class performs communication with the servos using Dynamixel protocol
- * and manages the state of these servos. It uses for this purpose 
+ * and manages the state of these servos. It uses for this purpose
  * [Dynamixel SDK](https://github.com/ROBOTIS-GIT/DynamixelSDK) (specifically the
  * ROS implementation of it) with the only exception that for port communication
  * it uses a custom subclass of ``PortHandler`` in order to be able to configure
  * the communication port with RS485 support, because the interface board used
  * by RH5 robot uses SC16IS762 chips with hardware control flow that needs
  * to be configured in RS485 mode via ``ioctl``.
- * 
+ *
  * The class uses the information from the URDF to get details about the
  * communication port configuration and the attached servos. For each dynamixel
  * interface the following parameters are read:
- * 
+ *
  */
 class MH5DynamixelBus: public hardware_interface::SystemInterface
 {
-  ~MH5DynamixelBus(); // handles the Ctr-C shutdown
+
+public:
+  // ~MH5DynamixelBus(); // handles the Ctr-C shutdown
 
   hardware_interface::CallbackReturn on_init(
     const hardware_interface::HardwareInfo & info) override;
@@ -71,6 +85,14 @@ class MH5DynamixelBus: public hardware_interface::SystemInterface
   hardware_interface::return_type write(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
+  // mh5_port_handler::PortHandlerMH5* getPortHandler() {return portHandler_; };
+  // dynamixel::PacketHandler* getPacketHandler() {return packetHandler_; };
+
+  int parseIntParam(const std::string & param, const int def, const std::string mu);
+
+  // friend class DynamixelLoop;
+  // friend class PVEReader;
+
 protected:
 
     // communication
@@ -78,6 +100,7 @@ protected:
     int             baudrate_;
     bool            rs485_;
     double          protocol_;
+    int             latency_;
 
     // dynamixel communication
     mh5_port_handler::PortHandlerMH5    *portHandler_;
@@ -88,17 +111,32 @@ protected:
     std::vector<DynamixelJoint>         joints_{};
 
     // dynamixel loops
-    std::unique_ptr<dynamixel::GroupSyncRead>            pve_read_;
-    std::unique_ptr<dynamixel::GroupSyncRead>            stat_read_;
-    rclcpp::Time                                         stat_read_last_run_;
-    double                                               stat_read_rate_;
+    std::unique_ptr<dynamixel::GroupSyncRead>         pve_read_;
+    PacketCounter                                     pve_read_stats_;
+
+    /**
+     * for reading information about the state of the device we have two separate
+     * SyncReads because the data is spread in the registry and we cannot use the
+     * indirect registers for all data because of the different treatment between
+     * XL430 and XL330. So the solution is:
+     * - for temp and voltage we will use one SyncRead that will read all devices
+     * - for torque, led, hwerr and moving we setup indirect registers in the only 4
+     * registers that overlap between XL430 and XL330: data regs 224-227. These are
+     * configured in .XACRO file differently for XL430 and XL330 servos.
+     */
+    std::unique_ptr<dynamixel::GroupSyncRead>         info1_read_;    // temp, voltage
+    PacketCounter                                     info1_read_stats_;
+    std::unique_ptr<dynamixel::GroupSyncRead>         info2_read_;    // torque, hwerr, led, moving
+    PacketCounter                                     info2_read_stats_;
+
+    PacketCounter                                     torque_write_stats_;
 
     // int                         num_sensors_;
     // std::vector<FootSensor *>   foot_sensors_;
 
     /**
      * @brief Initializes the Dynamixel port.
-     * 
+     *
      * @return true if initialization was successful
      * @return false if initialization was unsuccessful
      */
@@ -106,7 +144,7 @@ protected:
 
     /**
      * @brief Initializes the joints.
-     * 
+     *
      * @return true if all joints have been initialized successfully
      * @return false if any of the joints raised errors
      */
@@ -114,22 +152,22 @@ protected:
 
     /**
      * @brief Initializes the sensors.
-     * 
-     * @return true 
-     * @return false 
+     *
+     * @return true
+     * @return false
      */
     bool initSensors();
 
     /**
      * @brief Convenience function that constructs a loop, reads parameters
      * "rates/<loop_name>" from parameter server or, if not found, uses
-     * a default rate for initialisation. It also calls prepare() and 
+     * a default rate for initialisation. It also calls prepare() and
      * registers it communication handle (from getCommStatHandle() with the
      * HW communication status inteface)
-     * 
+     *
      * @tparam Loop the class for the loop
      * @param name the name of the loop
-     * @param default_rate the default rate to use incase no parameter is 
+     * @param default_rate the default rate to use incase no parameter is
      * found in the parameter server
      * @return Loop* the newly created loop object
      */
@@ -142,12 +180,16 @@ protected:
      * - Read: temperature, voltage (tv_reader)
      * - Write: position, velocity (pv_writer)
      * - Write: torque (t_writer)
-     * 
-     * @return true 
+     *
+     * @return true
      */
     bool setupDynamixelLoops();
 
     // bool ping(const uint8_t id, const int num_tries=5);
+
+    bool read_pve();
+    bool read_info1();
+    bool read_info2();
 
 };
 
