@@ -79,6 +79,11 @@
         "variant": "cpp"
     },
     "cSpell.words": [
-        "dynamixel"
+        "baudrate",
+        "dynamixel",
+        "hwerr",
+        "RCLCPP",
+        "URDF",
+        "xacro"
     ]
 }

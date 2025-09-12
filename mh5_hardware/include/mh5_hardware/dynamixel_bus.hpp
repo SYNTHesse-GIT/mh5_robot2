@@ -111,24 +111,11 @@ protected:
     std::vector<DynamixelJoint>         joints_{};
 
     // dynamixel loops
+    // position, velocity, effort
     std::unique_ptr<dynamixel::GroupSyncRead>         pve_read_;
     PacketCounter                                     pve_read_stats_;
-
-    /**
-     * for reading information about the state of the device we have two separate
-     * SyncReads because the data is spread in the registry and we cannot use the
-     * indirect registers for all data because of the different treatment between
-     * XL430 and XL330. So the solution is:
-     * - for temp and voltage we will use one SyncRead that will read all devices
-     * - for torque, led, hwerr and moving we setup indirect registers in the only 4
-     * registers that overlap between XL430 and XL330: data regs 224-227. These are
-     * configured in .XACRO file differently for XL430 and XL330 servos.
-     */
-    // std::unique_ptr<dynamixel::GroupSyncRead>         info1_read_;    // temp, voltage
-    // PacketCounter                                     info1_read_stats_;
-    // std::unique_ptr<dynamixel::GroupSyncRead>         info2_read_;    // torque, hwerr, led, moving
-    // PacketCounter                                     info2_read_stats_;
-    std::unique_ptr<dynamixel::GroupSyncRead>         info_read_;     // temp, voltage, torque, hwerr, led, moving
+    // servo info: torque enabled, hardware error, voltage, temperature, led, moving
+    std::unique_ptr<dynamixel::GroupSyncRead>         info_read_;
     PacketCounter                                     info_read_stats_;
 
     PacketCounter                                     torque_write_stats_;
@@ -191,7 +178,6 @@ protected:
 
     bool read_pve();
     bool read_info();
-    // bool read_info2();
 
 };
 

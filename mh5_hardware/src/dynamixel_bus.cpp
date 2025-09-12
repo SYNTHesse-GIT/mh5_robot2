@@ -285,9 +285,7 @@ int MH5DynamixelBus::parseIntParam(const std::string & param, const int def, con
 
 bool MH5DynamixelBus::setupDynamixelLoops()
 {
-    // dynamixel state (error, led, active, temperature, voltage)
-    // info1_read_ = std::make_unique<dynamixel::GroupSyncRead>(portHandler_, packetHandler_, 144, 3);
-    // info2_read_ = std::make_unique<dynamixel::GroupSyncRead>(portHandler_, packetHandler_, 224, 4);
+    // dynamixel info (error, led, active, temperature, voltage)
     info_read_ = std::make_unique<dynamixel::GroupSyncRead>(portHandler_, packetHandler_, 224, 7);
     for (auto & joint : joints_) {
         if (joint.available_) {
@@ -295,17 +293,12 @@ bool MH5DynamixelBus::setupDynamixelLoops()
                 RCLCPP_ERROR(get_logger(), "info_read failed to add joint id %i. This should not happen.", joint.id_);
                 return false;
             }
-            // if (!info2_read_->addParam(joint.id_)) {
-            //     RCLCPP_ERROR(get_logger(), "info_read(torque, hwerr, led, moving) failed to add joint id %i. This should not happen.", joint.id_);
-            //     return false;
-            // }
             RCLCPP_DEBUG(get_logger(), "info_read loop added joint %s[%i]", joint.name_.c_str(), joint.id_);
         }
     }
     int info_rate = parseIntParam("info_read_rate", 1, "Hz");
     int horiz = parseIntParam("info_read_horizon", 60, "s");
     info_read_stats_ = PacketCounter(info_rate, horiz, get_clock()->now());
-    // info2_read_stats_ = PacketCounter(info_rate, horiz, get_clock()->now());
     RCLCPP_INFO(get_logger(), "info_read loop configured");
 
 
@@ -357,7 +350,7 @@ MH5DynamixelBus::export_state_interfaces()
         // }
 
         // // sensors
-        // state_interfaces.emplace_back(hardware_interface::StateInterface(ultrasonic_.name, trilobot_hardware::HW_IF_DISTANCE, &ultrasonic_.distance));
+        //
 
         return state_interfaces;
 }
@@ -374,10 +367,6 @@ MH5DynamixelBus::export_command_interfaces()
         // for (auto resource : resources_) {
         //     resource->add_command_interfaces(&command_interfaces);
         // }
-
-        // command_interfaces.emplace_back(hardware_interface::CommandInterface(ultrasonic_.name, trilobot_hardware::HW_IF_OFFSET, &ultrasonic_.offset));
-        // command_interfaces.emplace_back(hardware_interface::CommandInterface(ultrasonic_.name, trilobot_hardware::HW_IF_SAMPLES, &ultrasonic_.samples));
-        // command_interfaces.emplace_back(hardware_interface::CommandInterface(ultrasonic_.name, trilobot_hardware::HW_IF_TIMEOUT, &ultrasonic_.timeout));
 
         return command_interfaces;
 }
@@ -467,20 +456,6 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period
         }
     }
 
-    // info: torque, led, hwerr, moving
-    // if(info2_read_stats_.shouldRun(time, period, previous_run)) {
-    //     info2_read_stats_.addRun(time);
-    //     bool result = read_info2();
-    //     if (!result) {
-    //         info2_read_stats_.addErr();
-    //     }
-    //     previous_run = true;
-    //     if (info2_read_stats_.shouldReset(time)) {
-    //         info2_read_stats_.reset(time);
-    //         info2_read_stats_.log_info(get_logger(), "info2_read");
-    //     }
-    // }
-
     return hardware_interface::return_type::OK;
 }
 
@@ -524,7 +499,6 @@ bool MH5DynamixelBus::read_pve()
             }
         }
     }
-
     return true;
 }
 
@@ -591,25 +565,6 @@ bool MH5DynamixelBus::read_info()
     }
     return true;
 }
-
-
-// bool MH5DynamixelBus::read_info2()
-// {
-//     int dxl_comm_result = info2_read_->txRxPacket();
-
-//     if (dxl_comm_result != COMM_SUCCESS) {
-//         RCLCPP_DEBUG(get_logger(), "info_read(torque, hwerr, led, moving) communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
-//         return false;
-//     }
-
-//     for (auto  & joint : joints_) {
-//         if (joint.available_) {
-
-//         }
-//     }
-
-//     return true;
-// }
 
 
 hardware_interface::return_type
