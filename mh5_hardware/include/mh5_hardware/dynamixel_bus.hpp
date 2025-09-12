@@ -124,10 +124,12 @@ protected:
      * registers that overlap between XL430 and XL330: data regs 224-227. These are
      * configured in .XACRO file differently for XL430 and XL330 servos.
      */
-    std::unique_ptr<dynamixel::GroupSyncRead>         info1_read_;    // temp, voltage
-    PacketCounter                                     info1_read_stats_;
-    std::unique_ptr<dynamixel::GroupSyncRead>         info2_read_;    // torque, hwerr, led, moving
-    PacketCounter                                     info2_read_stats_;
+    // std::unique_ptr<dynamixel::GroupSyncRead>         info1_read_;    // temp, voltage
+    // PacketCounter                                     info1_read_stats_;
+    // std::unique_ptr<dynamixel::GroupSyncRead>         info2_read_;    // torque, hwerr, led, moving
+    // PacketCounter                                     info2_read_stats_;
+    std::unique_ptr<dynamixel::GroupSyncRead>         info_read_;     // temp, voltage, torque, hwerr, led, moving
+    PacketCounter                                     info_read_stats_;
 
     PacketCounter                                     torque_write_stats_;
 
@@ -188,8 +190,8 @@ protected:
     // bool ping(const uint8_t id, const int num_tries=5);
 
     bool read_pve();
-    bool read_info1();
-    bool read_info2();
+    bool read_info();
+    // bool read_info2();
 
 };
 

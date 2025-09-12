@@ -161,11 +161,16 @@ bool MH5DynamixelBus::initJoints()
             RCLCPP_ERROR(get_logger(), "missing model for joint %s", joint.name.c_str());
             return false;
         }
-        if (joint.parameters["model"] != "XL430" && joint.parameters["model"] != "XL330") {
+        if (joint.parameters["model"] == "XL430") {
+            j.model_ = DynamixelJoint::XL430;
+        }
+        else if (joint.parameters["model"] == "XL330") {
+            j.model_ = DynamixelJoint::XL330;
+        }
+        else {
             RCLCPP_ERROR(get_logger(), "unknown model for joint %s: %s", joint.name.c_str(), joint.parameters["model"].c_str());
             return false;
         }
-        j.model_ = joint.parameters["model"];
         int dxl_comm_result;
         uint8_t dxl_error = 0;
         if (packetHandler_->ping(portHandler_, id, &dxl_error) != COMM_SUCCESS) {
@@ -281,26 +286,27 @@ int MH5DynamixelBus::parseIntParam(const std::string & param, const int def, con
 bool MH5DynamixelBus::setupDynamixelLoops()
 {
     // dynamixel state (error, led, active, temperature, voltage)
-    info1_read_ = std::make_unique<dynamixel::GroupSyncRead>(portHandler_, packetHandler_, 144, 3);
-    info2_read_ = std::make_unique<dynamixel::GroupSyncRead>(portHandler_, packetHandler_, 224, 4);
+    // info1_read_ = std::make_unique<dynamixel::GroupSyncRead>(portHandler_, packetHandler_, 144, 3);
+    // info2_read_ = std::make_unique<dynamixel::GroupSyncRead>(portHandler_, packetHandler_, 224, 4);
+    info_read_ = std::make_unique<dynamixel::GroupSyncRead>(portHandler_, packetHandler_, 224, 7);
     for (auto & joint : joints_) {
         if (joint.available_) {
-            if(!info1_read_->addParam(joint.id_)) {
-                RCLCPP_ERROR(get_logger(), "info_read(temp, volt) failed to add joint id %i. This should not happen.", joint.id_);
+            if(!info_read_->addParam(joint.id_)) {
+                RCLCPP_ERROR(get_logger(), "info_read failed to add joint id %i. This should not happen.", joint.id_);
                 return false;
             }
-            if (!info2_read_->addParam(joint.id_)) {
-                RCLCPP_ERROR(get_logger(), "info_read(torque, hwerr, led, moving) failed to add joint id %i. This should not happen.", joint.id_);
-                return false;
-            }
+            // if (!info2_read_->addParam(joint.id_)) {
+            //     RCLCPP_ERROR(get_logger(), "info_read(torque, hwerr, led, moving) failed to add joint id %i. This should not happen.", joint.id_);
+            //     return false;
+            // }
             RCLCPP_DEBUG(get_logger(), "info_read loop added joint %s[%i]", joint.name_.c_str(), joint.id_);
         }
     }
     int info_rate = parseIntParam("info_read_rate", 1, "Hz");
     int horiz = parseIntParam("info_read_horizon", 60, "s");
-    info1_read_stats_ = PacketCounter(info_rate, horiz, get_clock()->now());
-    info2_read_stats_ = PacketCounter(info_rate, horiz, get_clock()->now());
-    RCLCPP_INFO(get_logger(), "info_read loops configured");
+    info_read_stats_ = PacketCounter(info_rate, horiz, get_clock()->now());
+    // info2_read_stats_ = PacketCounter(info_rate, horiz, get_clock()->now());
+    RCLCPP_INFO(get_logger(), "info_read loop configured");
 
 
     // position, velocity, effort
@@ -313,7 +319,7 @@ bool MH5DynamixelBus::setupDynamixelLoops()
     }
     int pve_rate = parseIntParam("pve_read_rate", 100, "Hz");
     horiz = parseIntParam("pve_read_horizon", 60, "s");
-    // we increase the rate to accomodate the loops skipped due to info_read
+    // we increase the rate to accommodate the loops skipped due to info_read
     pve_read_stats_ = PacketCounter(pve_rate, horiz, get_clock()->now());
     RCLCPP_INFO(get_logger(), "pve_read loop configured");
 
@@ -447,33 +453,33 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period
         }
     }
 
-    // info: temperature, voltage
-    if (info1_read_stats_.shouldRun(time, period, previous_run)) {
-        info1_read_stats_.addRun(time);
-        bool result = read_info1();
+    // info: temperature, voltage, etc.
+    if (info_read_stats_.shouldRun(time, period, previous_run)) {
+        info_read_stats_.addRun(time);
+        bool result = read_info();
         if (!result) {
-            info1_read_stats_.addErr();
+            info_read_stats_.addErr();
         }
         previous_run = true;
-        if (info1_read_stats_.shouldReset(time)) {
-            info1_read_stats_.reset(time);
-            info1_read_stats_.log_info(get_logger(), "info1_read");
+        if (info_read_stats_.shouldReset(time)) {
+            info_read_stats_.reset(time);
+            info_read_stats_.log_info(get_logger(), "info_read");
         }
     }
 
     // info: torque, led, hwerr, moving
-    if(info2_read_stats_.shouldRun(time, period, previous_run)) {
-        info2_read_stats_.addRun(time);
-        bool result = read_info2();
-        if (!result) {
-            info2_read_stats_.addErr();
-        }
-        previous_run = true;
-        if (info2_read_stats_.shouldReset(time)) {
-            info2_read_stats_.reset(time);
-            info2_read_stats_.log_info(get_logger(), "info2_read");
-        }
-    }
+    // if(info2_read_stats_.shouldRun(time, period, previous_run)) {
+    //     info2_read_stats_.addRun(time);
+    //     bool result = read_info2();
+    //     if (!result) {
+    //         info2_read_stats_.addErr();
+    //     }
+    //     previous_run = true;
+    //     if (info2_read_stats_.shouldReset(time)) {
+    //         info2_read_stats_.reset(time);
+    //         info2_read_stats_.log_info(get_logger(), "info2_read");
+    //     }
+    // }
 
     return hardware_interface::return_type::OK;
 }
@@ -523,87 +529,87 @@ bool MH5DynamixelBus::read_pve()
 }
 
 
-bool MH5DynamixelBus::read_info1()
+bool MH5DynamixelBus::read_info()
 {
-    int dxl_comm_result = info1_read_->txRxPacket();
+    int dxl_comm_result = info_read_->txRxPacket();
 
     if (dxl_comm_result != COMM_SUCCESS) {
-        RCLCPP_DEBUG(get_logger(), "info_read(temp, volt) communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
-        return false;
-    }
-
-    for (auto  & joint : joints_) {
-        if (joint.available_) {
-            // voltage
-            if (! info1_read_->isAvailable(joint.id_, 144, 2)) {
-                RCLCPP_DEBUG(get_logger(), "info_read getting voltage for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
-            }
-            else {
-                joint.voltage_ = info1_read_->getData(joint.id_, 144, 2);
-            }
-            // temp
-            if (! info1_read_->isAvailable(joint.id_, 146, 1)) {
-                RCLCPP_DEBUG(get_logger(), "info_read getting temp for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
-            }
-            else {
-                joint.temperature_ = info1_read_->getData(joint.id_, 146, 1);
-            }
-        }
-    }
-
-        return true;
-}
-
-
-bool MH5DynamixelBus::read_info2()
-{
-    int dxl_comm_result = info2_read_->txRxPacket();
-
-    if (dxl_comm_result != COMM_SUCCESS) {
-        RCLCPP_DEBUG(get_logger(), "info_read(torque, hwerr, led, moving) communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
+        RCLCPP_DEBUG(get_logger(), "info_read communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
         return false;
     }
 
     for (auto  & joint : joints_) {
         if (joint.available_) {
             // torque
-            if (! info2_read_->isAvailable(joint.id_, 224, 1)) {
+            if (! info_read_->isAvailable(joint.id_, 224, 1)) {
                 RCLCPP_DEBUG(get_logger(), "info_read getting torque for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
             }
             else {
-                joint.torque_enable_ = info2_read_->getData(joint.id_, 224, 1);
-            }
-            // led
-            if (! info2_read_->isAvailable(joint.id_, 225, 1)) {
-                RCLCPP_DEBUG(get_logger(), "info_read getting led for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
-            }
-            else {
-                joint.led_ = info2_read_->getData(joint.id_, 225, 1);
+                joint.torque_enable_ = info_read_->getData(joint.id_, 224, 1);
             }
             // hwerr
-            if (! info2_read_->isAvailable(joint.id_,226, 1)) {
+            if (! info_read_->isAvailable(joint.id_,225, 1)) {
                 RCLCPP_DEBUG(get_logger(), "info_read getting hwerr for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
             }
             else {
-                uint8_t data = info2_read_->getData(joint.id_, 226, 1);
+                uint8_t data = info_read_->getData(joint.id_, 225, 1);
                 joint.error_input_voltage_ = data & 1<<0;
                 joint.error_overheating_ = data & 1<<2;
                 joint.error_motor_encoder_ = data & 1<<3;
                 joint.error_electrical_shock_ = data & 1<<4;
                 joint.error_overload_ = data & 1<<5;
             }
-            // moving
-            if (! info2_read_->isAvailable(joint.id_, 227, 1)) {
+            // voltage
+            if (! info_read_->isAvailable(joint.id_, 226, 2)) {
+                RCLCPP_DEBUG(get_logger(), "info_read getting voltage for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+            }
+            else {
+                joint.voltage_ = info_read_->getData(joint.id_, 226, 2);
+            }
+            // temp
+            if (! info_read_->isAvailable(joint.id_, 228, 1)) {
+                RCLCPP_DEBUG(get_logger(), "info_read getting temp for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+            }
+            else {
+                joint.temperature_ = info_read_->getData(joint.id_, 228, 1);
+            }
+            // led
+            if (! info_read_->isAvailable(joint.id_, 229, 1)) {
                 RCLCPP_DEBUG(get_logger(), "info_read getting led for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
             }
             else {
-                joint.moving_ = info2_read_->getData(joint.id_, 227, 1);
+                joint.led_ = info_read_->getData(joint.id_, 229, 1);
+            }
+            // moving
+            if (! info_read_->isAvailable(joint.id_, 230, 1)) {
+                RCLCPP_DEBUG(get_logger(), "info_read getting moving for joint %s[%i] failed", joint.name_.c_str(), joint.id_);
+            }
+            else {
+                joint.moving_ = info_read_->getData(joint.id_, 230, 1);
             }
         }
     }
-
     return true;
 }
+
+
+// bool MH5DynamixelBus::read_info2()
+// {
+//     int dxl_comm_result = info2_read_->txRxPacket();
+
+//     if (dxl_comm_result != COMM_SUCCESS) {
+//         RCLCPP_DEBUG(get_logger(), "info_read(torque, hwerr, led, moving) communication failed: %s", packetHandler_->getTxRxResult(dxl_comm_result));
+//         return false;
+//     }
+
+//     for (auto  & joint : joints_) {
+//         if (joint.available_) {
+
+//         }
+//     }
+
+//     return true;
+// }
 
 
 hardware_interface::return_type

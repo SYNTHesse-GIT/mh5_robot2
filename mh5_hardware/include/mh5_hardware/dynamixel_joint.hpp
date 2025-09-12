@@ -8,7 +8,7 @@ namespace mh5_hardware
 struct DynamixelJoint
 {
     std::string                         name_;
-    std::string                         model_;
+    enum { XL430, XL330}                model_;
     int                                 id_;
     bool                                available_;
 
