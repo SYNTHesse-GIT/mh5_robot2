@@ -44,6 +44,7 @@
         <state_interface name="error_overheating" />
         <state_interface name="error_input_voltage" />
         <state_interface name="led" />
+        <state_interface name="moving" />
         <command_interface name ="torque_enable" />
         <command_interface name="position" />
       </joint>
