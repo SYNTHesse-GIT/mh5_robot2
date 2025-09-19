@@ -363,6 +363,7 @@ MH5DynamixelBus::export_command_interfaces()
 
         for (auto & joint : joints_) {
             command_interfaces.emplace_back(hardware_interface::CommandInterface(joint.name_, "torque_enable", &joint.torque_command_));
+            command_interfaces.emplace_back(hardware_interface::CommandInterface(joint.name_, hardware_interface::HW_IF_POSITION, &joint.position_command_));
         }
         // for (auto resource : resources_) {
         //     resource->add_command_interfaces(&command_interfaces);
