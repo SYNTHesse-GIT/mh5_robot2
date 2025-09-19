@@ -436,10 +436,7 @@ MH5DynamixelBus::read(const rclcpp::Time & time, const rclcpp::Duration & period
         previous_run = true;
         if (pve_read_stats_.shouldReset(time)) {
             pve_read_stats_.reset(time);
-            RCLCPP_INFO(get_logger(), "pve_read stats: (%i, %i, %5.2f%%) (%i, %i, %5.2f%%, %5.2fHz)",
-                            pve_read_stats_.total_packets_, pve_read_stats_.total_errors_, pve_read_stats_.error_rate_,
-                            pve_read_stats_.last_packets_, pve_read_stats_.last_errors_, pve_read_stats_.last_error_rate_,
-                            (float) pve_read_stats_.last_packets_ / pve_read_stats_.horizon_);
+            pve_read_stats_.log_info(get_logger(), "pve_read");
         }
     }
 
@@ -601,10 +598,7 @@ MH5DynamixelBus::write(const rclcpp::Time & time, const rclcpp::Duration & perio
     }
     if (torque_write_stats_.shouldReset(time)) {
         torque_write_stats_.reset(time);
-        RCLCPP_INFO(get_logger(), "torque_write stats: (%i, %i, %5.2f%%) (%i, %i, %5.2f%%, %5.2fHz)",
-                torque_write_stats_.total_packets_, torque_write_stats_.total_errors_, torque_write_stats_.error_rate_,
-                torque_write_stats_.last_packets_, torque_write_stats_.last_errors_, torque_write_stats_.last_error_rate_,
-                (float) torque_write_stats_.last_packets_ / torque_write_stats_.horizon_);
+        torque_write_stats_.log_info(get_logger(), "torque_write");
     }
 
     return hardware_interface::return_type::OK;
